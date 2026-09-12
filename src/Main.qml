@@ -402,7 +402,7 @@ ApplicationWindow {
         containerHeight: win.height
 
         onDiscardRequested: {
-            backend.discardRecovery();
+            backend.discardChanges();
             win.completePendingAction();
         }
 

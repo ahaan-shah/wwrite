@@ -292,6 +292,12 @@ void Backend::discardRecovery() {
     clearRecovery();
 }
 
+void Backend::discardChanges() {
+    clearRecovery();
+    setModified(false);
+    setStatus(QStringLiteral("Discarded unsaved changes"));
+}
+
 void Backend::reloadFromDisk() {
     if (m_fileUrl.isLocalFile())
         open(m_fileUrl);

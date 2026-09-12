@@ -69,6 +69,11 @@ public:
     Q_INVOKABLE void saveAs(const QUrl &url);
     Q_INVOKABLE void fileDialogCanceled();
     Q_INVOKABLE void discardRecovery();
+
+    // Throw away the unsaved work outright. discardRecovery() only deletes the
+    // crash snapshot; the document still counted as modified, so the close path
+    // kept re-asking about it and Discard could never finish.
+    Q_INVOKABLE void discardChanges();
     Q_INVOKABLE void reloadFromDisk();
     Q_INVOKABLE void keepExternalVersion();
     Q_INVOKABLE void printDocument();

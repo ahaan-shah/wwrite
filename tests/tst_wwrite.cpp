@@ -539,6 +539,36 @@ private slots:
                  QStringLiteral("second document"));
     }
 
+    void discardLetsTheWindowClose() {
+        const QString mainQmlPath = QFINDTESTDATA("../src/Main.qml");
+        QVERIFY(!mainQmlPath.isEmpty());
+
+        Session session(nullptr);
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty(QStringLiteral("session"), &session);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(mainQmlPath));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+
+        QObject *editor = window->property("currentEditor").value<QObject *>();
+        QVERIFY(editor);
+        editor->setProperty("text", QStringLiteral("something unsaved"));
+
+        Backend *document = session.current();
+        QVERIFY(document);
+        QVERIFY2(document->modified(), "typing should mark the document modified");
+        QCOMPARE(session.firstModified(), 0);
+
+        // Discard has to leave nothing for the close path to ask about again.
+        // discardRecovery() alone only removed the crash snapshot, so the
+        // document stayed modified and the dialog reopened forever: Save became
+        // the only way out of the window.
+        document->discardChanges();
+        QVERIFY(!document->modified());
+        QCOMPARE(session.firstModified(), -1);
+    }
+
     void offersSaveAsFromTheFooter() {
         const QString mainQmlPath = QFINDTESTDATA("../src/Main.qml");
         QVERIFY(!mainQmlPath.isEmpty());
