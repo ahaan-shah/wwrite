@@ -24,7 +24,7 @@ private:
 };
 }
 
-class NotesTest : public QObject {
+class WwriteTest : public QObject {
     Q_OBJECT
 
 private slots:
@@ -546,5 +546,5 @@ private:
     QTemporaryDir m_settingsDirectory;
 };
 
-QTEST_MAIN(NotesTest)
-#include "tst_notes.moc"
+QTEST_MAIN(WwriteTest)
+#include "tst_wwrite.moc"

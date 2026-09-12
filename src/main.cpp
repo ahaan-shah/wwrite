@@ -17,16 +17,16 @@ int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     // QSettings with no organization name writes to a literal
     // "Unknown Organization" directory, so give it one.
-    app.setOrganizationName(QStringLiteral("notes"));
-    app.setApplicationName(QStringLiteral("notes"));
-    app.setApplicationDisplayName(QStringLiteral("Notes"));
-    app.setDesktopFileName(QStringLiteral("notes"));
+    app.setOrganizationName(QStringLiteral("wwrite"));
+    app.setApplicationName(QStringLiteral("wwrite"));
+    app.setApplicationDisplayName(QStringLiteral("wwrite"));
+    app.setDesktopFileName(QStringLiteral("wwrite"));
     // Theme lookup only works once a platform theme plugin has added the XDG
     // icon paths, which is not guaranteed. Fall back to the copy compiled into
     // the binary so the window always carries an icon.
-    QIcon icon = QIcon::fromTheme(QStringLiteral("notes-md"));
+    QIcon icon = QIcon::fromTheme(QStringLiteral("org.gnome.TextEditor"));
     if (icon.isNull())
-        icon = QIcon(QStringLiteral(":/notes-md.svg"));
+        icon = QIcon(QStringLiteral(":/wwrite.svg"));
     app.setWindowIcon(icon);
 
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/iAWriterMonoS-Regular.ttf"));
@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
 
     engine.load(QUrl(QStringLiteral("qrc:/Main.qml")));
     if (engine.rootObjects().isEmpty()) {
-        qCritical() << "Could not load the Notes interface; resource available:"
+        qCritical() << "Could not load the wwrite interface; resource available:"
                     << QFile::exists(QStringLiteral(":/Main.qml"));
         return -1;
     }

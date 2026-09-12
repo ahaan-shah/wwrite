@@ -57,10 +57,10 @@ Dialog {
         Label {
             width: parent.width
             text: root.deleted
-                ? "This file was removed outside Notes. Keep your text as an unsaved document?"
+                ? "This file was removed outside wwrite. Keep your text as an unsaved document?"
                 : (root.locallyModified
-                   ? "This file changed outside Notes. Reloading will discard your changes."
-                   : "This file changed outside Notes.")
+                   ? "This file changed outside wwrite. Reloading will discard your changes."
+                   : "This file changed outside wwrite.")
             color: root.textColor
             wrapMode: Text.Wrap
             font.family: "iA Writer Mono S"

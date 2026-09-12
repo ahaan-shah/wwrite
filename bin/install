@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Install Notes into the current user's ~/.local tree. No root, no makepkg,
+# Install wwrite into the current user's ~/.local tree. No root, no makepkg,
 # no package repository: everything lands under XDG user directories, so
 # `bin/uninstall` can take all of it back out again.
 set -eu
@@ -12,27 +12,33 @@ DATADIR="${XDG_DATA_HOME:-$HOME/.local/share}"
 ICONDIR="$DATADIR/icons/hicolor"
 APPDIR="$DATADIR/applications"
 
+# Which icon name the launcher entry points at. Defaults to the desktop theme's
+# text-editor icon; set ICON=wwrite to use the art bundled in packaging/ instead.
+# That art is installed either way, so switching is one re-run apart.
+ICON="${ICON:-org.gnome.TextEditor}"
+
 "$ROOT/bin/build"
 
-install -Dm755 "$ROOT/build/notes" "$BINDIR/notes"
+install -Dm755 "$ROOT/build/wwrite" "$BINDIR/wwrite"
 
 # Scalable icon plus rasterised sizes: some docks and launchers still pick a
 # PNG over an SVG, and a few will not scale the SVG at all.
-install -Dm644 "$ROOT/packaging/notes-md.svg" "$ICONDIR/scalable/apps/notes-md.svg"
+install -Dm644 "$ROOT/packaging/wwrite.svg" "$ICONDIR/scalable/apps/wwrite.svg"
 if command -v rsvg-convert >/dev/null 2>&1; then
   for size in 16 24 32 48 64 128 256; do
     mkdir -p "$ICONDIR/${size}x${size}/apps"
-    rsvg-convert -w "$size" -h "$size" "$ROOT/packaging/notes-md.svg" \
-      -o "$ICONDIR/${size}x${size}/apps/notes-md.png"
-    chmod 644 "$ICONDIR/${size}x${size}/apps/notes-md.png"
+    rsvg-convert -w "$size" -h "$size" "$ROOT/packaging/wwrite.svg" \
+      -o "$ICONDIR/${size}x${size}/apps/wwrite.png"
+    chmod 644 "$ICONDIR/${size}x${size}/apps/wwrite.png"
   done
 fi
 
 # Launchers started by the compositor do not always inherit a login shell's
-# PATH, so bake the real path into Exec rather than relying on `notes` resolving.
+# PATH, so bake the real path into Exec rather than relying on `wwrite` resolving.
 mkdir -p "$APPDIR"
-sed "s|@BINDIR@|$BINDIR|g" "$ROOT/packaging/notes.desktop" > "$APPDIR/notes.desktop"
-chmod 644 "$APPDIR/notes.desktop"
+sed -e "s|@BINDIR@|$BINDIR|g" -e "s|@ICON@|$ICON|g" \
+    "$ROOT/packaging/wwrite.desktop" > "$APPDIR/wwrite.desktop"
+chmod 644 "$APPDIR/wwrite.desktop"
 
 # gtk-update-icon-cache indexes nothing without an index.theme, and the empty
 # cache it leaves behind can stop GTK finding the icon at all. A user-local
@@ -45,11 +51,11 @@ gtk-update-icon-cache -q -t -f "$ICONDIR" >/dev/null 2>&1 || true
 update-desktop-database -q "$APPDIR" >/dev/null 2>&1 || true
 
 echo "Installed:"
-echo "  $BINDIR/notes"
-echo "  $APPDIR/notes.desktop"
-echo "  $ICONDIR/scalable/apps/notes-md.svg"
+echo "  $BINDIR/wwrite"
+echo "  $APPDIR/wwrite.desktop"
+echo "  $ICONDIR/scalable/apps/wwrite.svg   (launcher icon name: $ICON)"
 
 case ":$PATH:" in
   *":$BINDIR:"*) ;;
-  *) echo; echo "Note: $BINDIR is not on your PATH; add it to run 'notes' from a shell." ;;
+  *) echo; echo "Note: $BINDIR is not on your PATH; add it to run 'wwrite' from a shell." ;;
 esac

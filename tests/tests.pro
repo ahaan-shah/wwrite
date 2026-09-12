@@ -1,11 +1,11 @@
 QT += core gui quick testlib
 CONFIG += testcase c++17
 TEMPLATE = app
-TARGET = tst_notes
+TARGET = tst_wwrite
 
 INCLUDEPATH += ../src
 SOURCES += \
-    tst_notes.cpp \
+    tst_wwrite.cpp \
     ../src/backend.cpp \
     ../src/markdownhighlighter.cpp
 HEADERS += \

@@ -1,7 +1,7 @@
 <RCC>
     <qresource prefix="/">
         <file alias="Main.qml">Main.qml</file>
-        <file alias="notes-md.svg">../packaging/notes-md.svg</file>
+        <file alias="wwrite.svg">../packaging/wwrite.svg</file>
         <file alias="SearchIconButton.qml">SearchIconButton.qml</file>
         <file alias="FooterIconButton.qml">FooterIconButton.qml</file>
         <file alias="SquareDialogButton.qml">SquareDialogButton.qml</file>

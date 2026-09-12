@@ -9,7 +9,7 @@ if command -v qmake6 >/dev/null 2>&1; then
 elif command -v qmake >/dev/null 2>&1; then
   QMAKE=qmake
 else
-  echo "qmake6 or qmake is required to build notes." >&2
+  echo "qmake6 or qmake is required to build wwrite." >&2
   exit 1
 fi
 
@@ -18,7 +18,7 @@ JOBS="$(nproc 2>/dev/null || echo 1)"
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
-"$QMAKE" "$ROOT/notes.pro"
+"$QMAKE" "$ROOT/wwrite.pro"
 make -j"$JOBS"
 
-echo "Built $BUILD_DIR/notes"
+echo "Built $BUILD_DIR/wwrite"

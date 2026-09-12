@@ -15,7 +15,7 @@ ApplicationWindow {
     minimumWidth: 320
     minimumHeight: 240
     visible: true
-    title: (backend.modified ? "* " : "") + backend.fileName + " - Notes"
+    title: (backend.modified ? "* " : "") + backend.fileName + " - wwrite"
 
     readonly property bool darkMode: backend.darkMode
     readonly property color pageColor: backend.themeBackground

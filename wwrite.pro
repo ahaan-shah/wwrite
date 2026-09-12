@@ -1,7 +1,7 @@
 QT += core gui widgets printsupport qml quick quickcontrols2 dbus svg
 
 CONFIG += c++17 release
-TARGET = notes
+TARGET = wwrite
 TEMPLATE = app
 
 HEADERS += \

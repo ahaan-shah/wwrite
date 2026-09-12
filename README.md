@@ -1,11 +1,28 @@
-# Notes
+# wwrite
 
 A dead-simple Markdown writing app built with Qt Quick and C++, themed from
 [pywal](https://github.com/dylanaraps/pywal).
 
-This is a fork of [omawrite](https://github.com/omacom/omawrite) with the
-Omarchy theme integration replaced by pywal, and the Omarchy package repository
-replaced by a plain user-local install.
+A fork of [omawrite](https://github.com/omacom/omawrite) retargeted from an
+Omarchy desktop to a pywal-themed one, with a file browser of its own so nothing
+in the app borrows another toolkit's look.
+
+## What this fork adds
+
+- **pywal theming.** Colours come from `~/.cache/wal`, re-read live when `wal`
+  runs. Replaces omawrite's Omarchy `colors.toml` integration.
+- **A built-in file browser.** Opening and saving no longer call out to a
+  platform dialog; the picker carries the same palette as the editor, and it can
+  reach the whole filesystem rather than just `$HOME`.
+- **Save As**, as a footer button as well as `Ctrl+Shift+S`, so an already-open
+  document can be written elsewhere without overwriting the original.
+- **Markdown or plain text**, chosen with a format toggle in the save view.
+- **Overwrite confirmation**, which the platform dialog used to handle.
+- **Refuses to open what it cannot edit** — directories, devices, huge files,
+  binary files.
+- **Resizes down to 320×240** instead of omawrite's 720×520 floor.
+- **User-local install** (`bin/install`) in place of the Arch PKGBUILD and the
+  Omarchy package repository.
 
 ## Install
 
@@ -17,21 +34,32 @@ That builds the app and installs it under `~/.local`:
 
 | Path | What |
 | --- | --- |
-| `~/.local/bin/notes` | the binary |
-| `~/.local/share/applications/notes.desktop` | launcher / dock entry, registered for Markdown files |
-| `~/.local/share/icons/hicolor/…/notes-md.{svg,png}` | app icon, scalable plus rasterised sizes |
-
-The icon is called `notes-md` rather than `notes` on purpose: icon themes are
-searched before hicolor, and several of them — Papirus included — already ship a
-`notes` icon (it is an alias for Standard Notes), which would quietly replace
-this one. The icon is also compiled into the binary, so the window still has one
-if no icon theme is configured.
+| `~/.local/bin/wwrite` | the binary |
+| `~/.local/share/applications/wwrite.desktop` | launcher / dock entry, registered for Markdown and plain text |
+| `~/.local/share/icons/hicolor/…/wwrite.{svg,png}` | bundled icon, scalable plus rasterised sizes |
 
 No root, no `makepkg`, no extra repositories. `./bin/uninstall` takes it all
 back out. `PREFIX=/usr/local sudo -E ./bin/install` installs system-wide instead.
 
-Run `./bin/build` alone to just produce `build/notes`, and `./bin/test` for the
+Run `./bin/build` alone to just produce `build/wwrite`, and `./bin/test` for the
 test suite.
+
+### Icon
+
+The launcher entry points at the desktop theme's own text-editor icon
+(`org.gnome.TextEditor`), so it matches whatever icon theme is in use — on a
+Papirus-Dark desktop it resolves to Papirus's text editor icon. To use the icon
+bundled in `packaging/` instead:
+
+```sh
+ICON=wwrite ./bin/install
+```
+
+That art is installed either way, so switching is one re-run apart. It is also
+compiled into the binary, so a window still has an icon where no icon theme is
+configured. Note that theme icons are *referenced by name*, never copied into
+this repo — Papirus is GPL-3.0 and this project is MIT, so bundling its art
+would be a licence conflict.
 
 ## Theming
 
@@ -64,13 +92,13 @@ XDG desktop portal's `color-scheme` instead.
 
 ## Opening and saving
 
-Notes browses the filesystem itself rather than calling out to a platform file
+wwrite browses the filesystem itself rather than calling out to a platform file
 dialog, so the picker carries the same palette as the editor. Qt's own fallback
 dialog appears whenever no platform theme plugin is loaded, and it is styled by
 Material rather than by the wallpaper — which is the look this replaces.
 
 The browser has a places sidebar, a clickable breadcrumb, size and modified
-columns, a Markdown/all-files toggle and a dotfiles toggle. `Enter` opens or
+columns, a documents/all-files toggle and a dotfiles toggle. `Enter` opens or
 descends, `Backspace` goes up a level, `Esc` cancels, and double-click does the
 obvious thing. The sidebar and toggles fold away in a narrow window.
 
@@ -98,17 +126,17 @@ with replacement characters and write that corruption back on the next save.
 It is not confined to `$HOME`: the sidebar ends with a **Filesystem** entry for
 `/`, and the up button walks past the home directory all the way to the root, so
 `/etc`, `/usr/bin` and the rest are reachable. Most files outside `$HOME` have no
-Markdown extension, so flip the filter to **All files** to see them. Notes opens
+Markdown extension, so flip the filter to **All files** to see them. wwrite opens
 them read-write like any other file — saving over a root-owned file will fail on
 permissions, as it should.
 
 ## Shortcuts
 
-- `Ctrl+S` saves. Unsaved documents use the XDG desktop portal file picker.
+- `Ctrl+S` saves. Unsaved documents open the built-in browser first.
 - `Ctrl+Shift+S` saves as.
-- `Ctrl+O` opens a Markdown file through the portal picker.
+- `Ctrl+O` opens a file through the built-in browser.
 - `Ctrl+P` opens the system print dialog.
-- `Ctrl+N` opens a new Notes window.
+- `Ctrl+N` opens a new wwrite window.
 - `Ctrl+Z`, `Ctrl+Shift+Z`, and `Ctrl+Y` handle undo and redo.
 - `Super+F` toggles fullscreen. Qt maps this key as `Meta+F`.
 - `Ctrl+F` searches the document. Use `Enter` or `Ctrl+G` for the next match and `Shift+Enter` for the previous match.
@@ -116,18 +144,23 @@ permissions, as it should.
 - `Ctrl+B`, `Ctrl+I`, and `Ctrl+K` insert bold, italic, and link Markdown.
 - `Ctrl+?` shows the keyboard shortcut reference.
 
-Unsaved drafts are recovered after an abnormal exit. Notes also watches open
+Unsaved drafts are recovered after an abnormal exit. wwrite also watches open
 files and warns before an external change can replace local work.
 
 Text follows the desktop text size — GNOME's `text-scaling-factor`, read over
 the desktop portal — and re-flows without a restart. The default of 12px leaves
-Notes at the size it is designed around; larger and smaller sizes scale from
+wwrite at the size it is designed around; larger and smaller sizes scale from
 there.
 
 ## Requirements
 
 - Qt 6: `qt6-base`, `qt6-declarative`, `qt6-svg`
 - `librsvg` (optional), so the installer can rasterise PNG icon sizes
+
+## Licence
+
+MIT, as upstream — see `LICENSE`, which carries both David Heinemeier Hansson's
+copyright for the omawrite code this is built on and mine for the changes.
 
 The iA Writer Mono font is bundled under the SIL Open Font License 1.1; see
 `fonts/OFL.txt`. The font is copyright Information Architects Inc. and based on
