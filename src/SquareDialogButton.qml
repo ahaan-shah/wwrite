@@ -1,14 +1,26 @@
 import QtQuick
 import QtQuick.Controls
+import "ThemeColors.js" as ThemeColors
 
 Button {
     id: control
 
     property bool primary: false
     property bool darkMode: true
-    property color labelColor: primary ? "#ffffff" : "#d0d0d0"
+    property color pageColor: darkMode ? "#101010" : "#ffffff"
+    property color inkColor: darkMode ? "#eeeeee" : "#222324"
+    property color surfaceColor: ThemeColors.mix(pageColor, inkColor, 0.08)
     property color activeColor: "#428bca"
+    property color labelColor: primary
+        ? ThemeColors.readableOn(activeColor, pageColor, inkColor)
+        : inkColor
     property real textScale: 1
+
+    readonly property color restColor: primary ? activeColor : surfaceColor
+    readonly property color hoverColor: ThemeColors.mix(restColor, inkColor, 0.12)
+    readonly property color pressColor: ThemeColors.mix(restColor, pageColor, 0.22)
+
+    opacity: control.enabled ? 1 : 0.4
 
     leftPadding: 16
     rightPadding: 16
@@ -31,17 +43,11 @@ Button {
         implicitWidth: 88
         implicitHeight: 34
         radius: 0
-        color: control.primary
-            ? (control.down ? "#347ab3" : control.hovered ? "#4b96d0" : control.activeColor)
-            : control.down
-                ? (control.darkMode ? "#2a2a2a" : "#dedede")
-                : control.hovered
-                    ? (control.darkMode ? "#242424" : "#eeeeee")
-                    : (control.darkMode ? "#202020" : "#f6f6f6")
+        color: control.down
+            ? control.pressColor
+            : control.hovered ? control.hoverColor : control.restColor
         border.color: control.activeFocus
-            ? (control.darkMode ? "#eeeeee" : "#222324")
-            : control.primary
-                ? "#367eb7"
-                : (control.darkMode ? "#424242" : "#c8c8c8")
+            ? control.inkColor
+            : ThemeColors.mix(control.restColor, control.inkColor, 0.3)
     }
 }

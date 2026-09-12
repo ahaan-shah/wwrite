@@ -20,14 +20,18 @@ void MarkdownHighlighter::setDarkMode(bool darkMode) {
 }
 
 void MarkdownHighlighter::setColors(const QString &background, const QString &foreground,
-                                    const QString &accent) {
+                                    const QString &accent, const QString &muted,
+                                    const QString &surface) {
     if (m_customBackground == background && m_customForeground == foreground
-            && m_customAccent == accent)
+            && m_customAccent == accent && m_customMuted == muted
+            && m_customSurface == surface)
         return;
 
     m_customBackground = background;
     m_customForeground = foreground;
     m_customAccent = accent;
+    m_customMuted = muted;
+    m_customSurface = surface;
     rebuildFormats();
     rehighlight();
 }
@@ -41,17 +45,17 @@ void MarkdownHighlighter::setSearch(const QString &query, int currentMatchStart)
 }
 
 void MarkdownHighlighter::rebuildFormats() {
-    const QColor marker = m_darkMode ? QColor(QStringLiteral("#4f525a"))
-                                     : QColor(QStringLiteral("#aeb1b5"));
     const QColor background = !m_customBackground.isEmpty() ? QColor(m_customBackground)
         : (m_darkMode ? QColor(QStringLiteral("#101010")) : QColor(QStringLiteral("#ffffff")));
     const QColor text = !m_customForeground.isEmpty() ? QColor(m_customForeground)
         : (m_darkMode ? QColor(QStringLiteral("#eeeeee")) : QColor(QStringLiteral("#222324")));
     const QColor link = !m_customAccent.isEmpty() ? QColor(m_customAccent)
         : (m_darkMode ? QColor(QStringLiteral("#5584aa")) : QColor(QStringLiteral("#2077b2")));
+    const QColor marker = !m_customMuted.isEmpty() ? QColor(m_customMuted)
+        : (m_darkMode ? QColor(QStringLiteral("#4f525a")) : QColor(QStringLiteral("#aeb1b5")));
     const QColor quote = marker;
-    const QColor codeBackground = m_darkMode ? QColor(QStringLiteral("#1c1a1a"))
-                                             : QColor(QStringLiteral("#f8f8f8"));
+    const QColor codeBackground = !m_customSurface.isEmpty() ? QColor(m_customSurface)
+        : (m_darkMode ? QColor(QStringLiteral("#1c1a1a")) : QColor(QStringLiteral("#f8f8f8")));
 
     m_markerFormat = QTextCharFormat();
     m_markerFormat.setForeground(marker);
@@ -95,12 +99,20 @@ void MarkdownHighlighter::rebuildFormats() {
     m_linkFormat.setForeground(link);
     m_linkFormat.setFontUnderline(true);
 
+    // Tint the page toward the accent rather than using a fixed amber, which
+    // reads as a foreign colour against a wallpaper-derived palette. Text keeps
+    // the document's foreground colour, so stop well short of the accent.
+    const auto tinted = [&background, &link](qreal ratio) {
+        const qreal keep = 1.0 - ratio;
+        return QColor::fromRgbF(background.redF() * keep + link.redF() * ratio,
+                                background.greenF() * keep + link.greenF() * ratio,
+                                background.blueF() * keep + link.blueF() * ratio);
+    };
+
     m_searchFormat = QTextCharFormat();
-    m_searchFormat.setBackground(m_darkMode ? QColor(QStringLiteral("#725b18"))
-                                            : QColor(QStringLiteral("#ffe58a")));
+    m_searchFormat.setBackground(tinted(0.3));
     m_currentSearchFormat = QTextCharFormat();
-    m_currentSearchFormat.setBackground(m_darkMode ? QColor(QStringLiteral("#b36b20"))
-                                                   : QColor(QStringLiteral("#ffad42")));
+    m_currentSearchFormat.setBackground(tinted(0.6));
 }
 
 void MarkdownHighlighter::highlightBlock(const QString &text) {

@@ -1,0 +1,23 @@
+#!/usr/bin/env sh
+# Remove everything bin/install put in place.
+set -eu
+
+PREFIX="${PREFIX:-$HOME/.local}"
+BINDIR="$PREFIX/bin"
+DATADIR="${XDG_DATA_HOME:-$HOME/.local/share}"
+ICONDIR="$DATADIR/icons/hicolor"
+APPDIR="$DATADIR/applications"
+
+rm -f "$BINDIR/notes"
+rm -f "$APPDIR/notes.desktop"
+rm -f "$ICONDIR/scalable/apps/notes-md.svg"
+for size in 16 24 32 48 64 128 256; do
+  rm -f "$ICONDIR/${size}x${size}/apps/notes-md.png"
+done
+
+gtk-update-icon-cache -q -t -f "$ICONDIR" >/dev/null 2>&1 || true
+update-desktop-database -q "$APPDIR" >/dev/null 2>&1 || true
+
+echo "Removed Notes. Documents and recovery snapshots were left alone:"
+echo "  ${XDG_DATA_HOME:-$HOME/.local/share}/notes"
+echo "  ${XDG_CONFIG_HOME:-$HOME/.config}/notes"

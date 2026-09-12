@@ -1,15 +1,55 @@
 #!/usr/bin/env sh
+# Install Notes into the current user's ~/.local tree. No root, no makepkg,
+# no package repository: everything lands under XDG user directories, so
+# `bin/uninstall` can take all of it back out again.
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-PKGBUILD_DIR="$ROOT/pkgbuild"
 
-if ! command -v makepkg >/dev/null 2>&1; then
-  echo "makepkg is required to build and install the Arch package." >&2
-  exit 1
-fi
+PREFIX="${PREFIX:-$HOME/.local}"
+BINDIR="$PREFIX/bin"
+DATADIR="${XDG_DATA_HOME:-$HOME/.local/share}"
+ICONDIR="$DATADIR/icons/hicolor"
+APPDIR="$DATADIR/applications"
 
 "$ROOT/bin/build"
 
-cd "$PKGBUILD_DIR"
-exec makepkg -fsi "$@"
+install -Dm755 "$ROOT/build/notes" "$BINDIR/notes"
+
+# Scalable icon plus rasterised sizes: some docks and launchers still pick a
+# PNG over an SVG, and a few will not scale the SVG at all.
+install -Dm644 "$ROOT/packaging/notes-md.svg" "$ICONDIR/scalable/apps/notes-md.svg"
+if command -v rsvg-convert >/dev/null 2>&1; then
+  for size in 16 24 32 48 64 128 256; do
+    mkdir -p "$ICONDIR/${size}x${size}/apps"
+    rsvg-convert -w "$size" -h "$size" "$ROOT/packaging/notes-md.svg" \
+      -o "$ICONDIR/${size}x${size}/apps/notes-md.png"
+    chmod 644 "$ICONDIR/${size}x${size}/apps/notes-md.png"
+  done
+fi
+
+# Launchers started by the compositor do not always inherit a login shell's
+# PATH, so bake the real path into Exec rather than relying on `notes` resolving.
+mkdir -p "$APPDIR"
+sed "s|@BINDIR@|$BINDIR|g" "$ROOT/packaging/notes.desktop" > "$APPDIR/notes.desktop"
+chmod 644 "$APPDIR/notes.desktop"
+
+# gtk-update-icon-cache indexes nothing without an index.theme, and the empty
+# cache it leaves behind can stop GTK finding the icon at all. A user-local
+# hicolor tree usually has no index.theme, so seed one from the system copy.
+if [ ! -f "$ICONDIR/index.theme" ] && [ -f /usr/share/icons/hicolor/index.theme ]; then
+  install -Dm644 /usr/share/icons/hicolor/index.theme "$ICONDIR/index.theme"
+fi
+
+gtk-update-icon-cache -q -t -f "$ICONDIR" >/dev/null 2>&1 || true
+update-desktop-database -q "$APPDIR" >/dev/null 2>&1 || true
+
+echo "Installed:"
+echo "  $BINDIR/notes"
+echo "  $APPDIR/notes.desktop"
+echo "  $ICONDIR/scalable/apps/notes-md.svg"
+
+case ":$PATH:" in
+  *":$BINDIR:"*) ;;
+  *) echo; echo "Note: $BINDIR is not on your PATH; add it to run 'notes' from a shell." ;;
+esac

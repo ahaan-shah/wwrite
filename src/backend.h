@@ -28,6 +28,8 @@ class Backend : public QObject {
     Q_PROPERTY(QString themeForeground READ themeForeground NOTIFY themeColorsChanged)
     Q_PROPERTY(QString themeAccent READ themeAccent NOTIFY themeColorsChanged)
     Q_PROPERTY(QString themeSelection READ themeSelection NOTIFY themeColorsChanged)
+    Q_PROPERTY(QString themeMuted READ themeMuted NOTIFY themeColorsChanged)
+    Q_PROPERTY(QString themeSurface READ themeSurface NOTIFY themeColorsChanged)
 
 public:
     explicit Backend(QObject *parent = nullptr);
@@ -49,6 +51,8 @@ public:
     QString themeForeground() const { return m_themeForeground; }
     QString themeAccent() const { return m_themeAccent; }
     QString themeSelection() const { return m_themeSelection; }
+    QString themeMuted() const { return m_themeMuted; }
+    QString themeSurface() const { return m_themeSurface; }
     static int countWords(const QString &text);
     static QString normalizedLinkUrl(const QString &clipboardText);
     static QString suggestedFileName(const QString &text);
@@ -72,6 +76,14 @@ public:
     Q_INVOKABLE QVariantList hiddenRangesAt(int position) const;
     Q_INVOKABLE void setSearchHighlight(const QString &query, int currentMatchStart);
     Q_INVOKABLE void openExternalUrl(const QUrl &url);
+    Q_INVOKABLE QVariantList standardPlaces() const;
+    Q_INVOKABLE QVariantList folderCrumbs(const QUrl &folder) const;
+    Q_INVOKABLE QUrl startFolder() const;
+    Q_INVOKABLE QUrl saveStartFolder() const;
+    Q_INVOKABLE QUrl parentFolder(const QUrl &folder) const;
+    Q_INVOKABLE bool fileExists(const QUrl &url) const;
+    Q_INVOKABLE QUrl folderChild(const QUrl &folder, const QString &name) const;
+    Q_INVOKABLE QString fileNameOf(const QUrl &url) const;
     Q_INVOKABLE QVariantMap windowGeometry() const;
     Q_INVOKABLE void saveWindowGeometry(int x, int y, int width, int height, bool maximized);
 
@@ -108,8 +120,8 @@ private:
     void clearRecovery();
     QString recoveryPath() const;
     void watchCurrentFile();
-    void loadOmarchyTheme();
-    void watchOmarchyTheme();
+    void loadPywalTheme();
+    void watchPywalTheme();
 
     QUrl m_fileUrl;
     bool m_modified = false;
@@ -139,5 +151,8 @@ private:
     QString m_themeForeground;
     QString m_themeAccent;
     QString m_themeSelection;
+    QString m_themeMuted;
+    QString m_themeSurface;
+    bool m_pywalLoaded = false;
     QFileSystemWatcher m_themeWatcher;
 };

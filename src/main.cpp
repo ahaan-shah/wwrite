@@ -15,16 +15,24 @@
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
-    app.setApplicationName(QStringLiteral("omawrite"));
-    app.setDesktopFileName(QStringLiteral("omawrite"));
-    app.setWindowIcon(QIcon::fromTheme(QStringLiteral("omawrite")));
+    // QSettings with no organization name writes to a literal
+    // "Unknown Organization" directory, so give it one.
+    app.setOrganizationName(QStringLiteral("notes"));
+    app.setApplicationName(QStringLiteral("notes"));
+    app.setApplicationDisplayName(QStringLiteral("Notes"));
+    app.setDesktopFileName(QStringLiteral("notes"));
+    // Theme lookup only works once a platform theme plugin has added the XDG
+    // icon paths, which is not guaranteed. Fall back to the copy compiled into
+    // the binary so the window always carries an icon.
+    QIcon icon = QIcon::fromTheme(QStringLiteral("notes-md"));
+    if (icon.isNull())
+        icon = QIcon(QStringLiteral(":/notes-md.svg"));
+    app.setWindowIcon(icon);
 
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/iAWriterMonoS-Regular.ttf"));
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/iAWriterMonoS-Italic.ttf"));
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/iAWriterMonoS-Bold.ttf"));
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/iAWriterMonoS-BoldItalic.ttf"));
-    app.setOrganizationName(QStringLiteral("Omacom"));
-    app.setOrganizationDomain(QStringLiteral("omacom.io"));
 
     QQuickStyle::setStyle(QStringLiteral("Material"));
 
@@ -64,7 +72,7 @@ int main(int argc, char *argv[]) {
 
     engine.load(QUrl(QStringLiteral("qrc:/Main.qml")));
     if (engine.rootObjects().isEmpty()) {
-        qCritical() << "Could not load the Omawrite interface; resource available:"
+        qCritical() << "Could not load the Notes interface; resource available:"
                     << QFile::exists(QStringLiteral(":/Main.qml"));
         return -1;
     }

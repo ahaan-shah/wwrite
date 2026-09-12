@@ -1,34 +1,36 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
-import QtQuick.Dialogs as Dialogs
 import QtQuick.Layouts
 import QtQuick.Window
 import "EditorMutations.js" as EditorMutations
+import "ThemeColors.js" as ThemeColors
 
 ApplicationWindow {
     id: win
     width: 1280
     height: 820
-    minimumWidth: 720
-    minimumHeight: 520
+    // Small enough to tuck into a corner of a tiling layout; the editor column
+    // and the footer both reflow down to here.
+    minimumWidth: 320
+    minimumHeight: 240
     visible: true
-    title: (backend.modified ? "* " : "") + backend.fileName + " - Omawrite"
+    title: (backend.modified ? "* " : "") + backend.fileName + " - Notes"
 
     readonly property bool darkMode: backend.darkMode
     readonly property color pageColor: backend.themeBackground
     readonly property color textColor: backend.themeForeground
     readonly property color strongTextColor: backend.themeForeground
-    readonly property color mutedColor: darkMode ? "#909191" : "#aeb1b5"
+    readonly property color mutedColor: backend.themeMuted
+    readonly property color surfaceColor: backend.themeSurface
     readonly property color selectionFill: backend.themeSelection
-    // The desktop's text size knob (GNOME's text-scaling-factor, which
-    // `omarchy display text size` drives) anchored so its 12px default leaves
-    // the app at the sizes it was designed around.
+    // The desktop's text size knob (GNOME's text-scaling-factor) anchored so
+    // its 12px default leaves the app at the sizes it was designed around.
     readonly property real textScale: backend.textScale
     readonly property int editorFontPixelSize: scaledSize(20)
     readonly property int editorWidth: Math.min(
         Math.round(writerFontMetrics.averageCharacterWidth * 65),
-        Math.max(360, width - Math.round(writerFontMetrics.averageCharacterWidth * 20)))
+        Math.max(120, width - Math.round(writerFontMetrics.averageCharacterWidth * 20)))
     property bool closeConfirmed: false
     property bool searchOpen: false
     property bool searchUpdating: false
@@ -41,7 +43,17 @@ ApplicationWindow {
 
     Material.theme: darkMode ? Material.Dark : Material.Light
     Material.accent: backend.themeAccent
+    Material.background: pageColor
+    Material.foreground: textColor
     color: pageColor
+
+    Overlay.modal: Rectangle {
+        color: Qt.rgba(win.pageColor.r, win.pageColor.g, win.pageColor.b, 0.72)
+    }
+
+    Overlay.modeless: Rectangle {
+        color: Qt.rgba(win.pageColor.r, win.pageColor.g, win.pageColor.b, 0.4)
+    }
 
     onClosing: function(close) {
         if (closeConfirmed || !backend.modified)
@@ -241,12 +253,12 @@ ApplicationWindow {
         target: backend
 
         function onOpenDialogRequested() {
-            openFileDialog.open();
+            openFileDialog.openIn(backend.startFolder());
         }
 
         function onSaveDialogRequested(suggestedUrl) {
-            saveFileDialog.selectedFile = suggestedUrl;
-            saveFileDialog.open();
+            saveFileDialog.suggestedName = backend.fileNameOf(suggestedUrl);
+            saveFileDialog.openIn(backend.saveStartFolder());
         }
 
         function onCloseAfterSave() {
@@ -267,21 +279,37 @@ ApplicationWindow {
         }
     }
 
-    Dialogs.FileDialog {
+    FileBrowserDialog {
         id: openFileDialog
-        title: "Open File"
-        fileMode: Dialogs.FileDialog.OpenFile
-        nameFilters: ["Markdown files (*.md *.markdown)", "All files (*)"]
-        onAccepted: win.requestOpen(selectedFile)
+        saving: false
+        darkMode: win.darkMode
+        pageColor: win.pageColor
+        inkColor: win.textColor
+        mutedColor: win.mutedColor
+        surfaceColor: win.surfaceColor
+        accentColor: backend.themeAccent
+        selectionColor: win.selectionFill
+        textScale: win.textScale
+        containerWidth: win.width
+        containerHeight: win.height
+        onFileChosen: function(file) { win.requestOpen(file); }
     }
 
-    Dialogs.FileDialog {
+    FileBrowserDialog {
         id: saveFileDialog
-        title: "Save File"
-        fileMode: Dialogs.FileDialog.SaveFile
-        nameFilters: ["Markdown files (*.md *.markdown)", "All files (*)"]
-        onAccepted: backend.saveAs(selectedFile)
-        onRejected: {
+        saving: true
+        darkMode: win.darkMode
+        pageColor: win.pageColor
+        inkColor: win.textColor
+        mutedColor: win.mutedColor
+        surfaceColor: win.surfaceColor
+        accentColor: backend.themeAccent
+        selectionColor: win.selectionFill
+        textScale: win.textScale
+        containerWidth: win.width
+        containerHeight: win.height
+        onFileChosen: function(file) { backend.saveAs(file); }
+        onCanceled: {
             backend.fileDialogCanceled();
             win.awaitingPendingSave = false;
             win.pendingAction = "";
@@ -293,6 +321,7 @@ ApplicationWindow {
         fileName: backend.fileName
         darkMode: win.darkMode
         textScale: win.textScale
+        pageColor: win.pageColor
         textColor: win.textColor
         strongTextColor: win.strongTextColor
         activeButtonColor: backend.themeAccent
@@ -315,8 +344,10 @@ ApplicationWindow {
         id: externalChangeDialog
         darkMode: win.darkMode
         textScale: win.textScale
+        pageColor: win.pageColor
         textColor: win.textColor
         strongTextColor: win.strongTextColor
+        activeButtonColor: backend.themeAccent
         containerWidth: win.width
         containerHeight: win.height
 
@@ -324,15 +355,66 @@ ApplicationWindow {
         onReloadRequested: backend.reloadFromDisk()
     }
 
+    // Built by hand rather than with standardButtons, so it takes the pywal
+    // palette like every other surface instead of Material's own colours.
     Dialog {
         id: shortcutsDialog
         modal: true
-        title: "Keyboard shortcuts"
-        standardButtons: Dialog.Close
-        anchors.centerIn: parent
-        contentItem: Label {
-            text: "Ctrl+S  Save\nCtrl+Shift+S  Save As\nCtrl+O  Open\nCtrl+N  New Window\nCtrl+F  Find\nCtrl+H  Find and Replace\nCtrl+B  Bold\nCtrl+I  Italic\nCtrl+K  Link\nCtrl+P  Print\nF11 / Super+F  Fullscreen\nCtrl+?  Shortcuts"
-            lineHeight: 1.5
+        focus: true
+        padding: 20
+        topPadding: 20
+        closePolicy: Popup.CloseOnEscape
+
+        Overlay.modal: Rectangle {
+            color: Qt.rgba(win.pageColor.r, win.pageColor.g, win.pageColor.b, 0.72)
+        }
+        width: Math.min(win.scaledSize(420), win.width - 48)
+        x: Math.round((win.width - width) / 2)
+        y: Math.round((win.height - height) / 2)
+
+        background: Rectangle {
+            color: win.surfaceColor
+            border.color: ThemeColors.mix(win.surfaceColor, win.strongTextColor, 0.22)
+            radius: 0
+        }
+
+        contentItem: Column {
+            spacing: 12
+
+            Label {
+                text: "Keyboard shortcuts"
+                color: win.strongTextColor
+                font.family: "iA Writer Mono S"
+                font.pixelSize: win.scaledSize(16)
+                font.bold: true
+            }
+
+            Label {
+                text: "Ctrl+S  Save\nCtrl+Shift+S  Save As\nCtrl+O  Open\nCtrl+N  New Window\nCtrl+F  Find\nCtrl+H  Find and Replace\nCtrl+B  Bold\nCtrl+I  Italic\nCtrl+K  Link\nCtrl+P  Print\nF11 / Super+F  Fullscreen\nCtrl+?  Shortcuts"
+                color: win.textColor
+                lineHeight: 1.5
+                font.family: "iA Writer Mono S"
+                font.pixelSize: win.scaledSize(13)
+            }
+        }
+
+        footer: Item {
+            implicitHeight: closeShortcuts.implicitHeight + 20
+
+            SquareDialogButton {
+                id: closeShortcuts
+                anchors.right: parent.right
+                anchors.rightMargin: 20
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Close"
+                primary: true
+                darkMode: win.darkMode
+                pageColor: win.surfaceColor
+                inkColor: win.strongTextColor
+                activeColor: backend.themeAccent
+                textScale: win.textScale
+                onClicked: shortcutsDialog.close()
+            }
         }
     }
 
@@ -814,6 +896,14 @@ ApplicationWindow {
             }
 
             FooterIconButton {
+                objectName: "saveAsButton"
+                iconName: "saveas"
+                iconColor: win.mutedColor
+                tooltip: "Save As"
+                onClicked: backend.saveAsDialog()
+            }
+
+            FooterIconButton {
                 objectName: "openButton"
                 iconName: "open"
                 iconColor: win.mutedColor
@@ -865,7 +955,7 @@ ApplicationWindow {
 
             background: Rectangle {
                 radius: 9
-                color: win.darkMode ? "#22221f" : "#fffef2"
+                color: win.surfaceColor
             }
 
             RowLayout {
@@ -940,7 +1030,7 @@ ApplicationWindow {
                     text: win.searchMatches.length === 0
                         ? "0/0"
                         : (win.searchMatchIndex + 1) + "/" + win.searchMatches.length
-                    color: win.darkMode ? win.textColor : "#62635f"
+                    color: win.mutedColor
                     font.pixelSize: win.scaledSize(16)
                 }
 
@@ -976,24 +1066,24 @@ ApplicationWindow {
                 Rectangle {
                     Layout.preferredWidth: 1
                     Layout.preferredHeight: 34
-                    color: win.darkMode ? "#6f6f62" : "#d5d56e"
+                    color: win.mutedColor
                 }
 
                 SearchIconButton {
                     iconName: "up"
-                    iconColor: win.darkMode ? win.textColor : "#62635f"
+                    iconColor: win.textColor
                     onClicked: win.moveSearch(-1)
                 }
 
                 SearchIconButton {
                     iconName: "down"
-                    iconColor: win.darkMode ? win.textColor : "#62635f"
+                    iconColor: win.textColor
                     onClicked: win.moveSearch(1)
                 }
 
                 SearchIconButton {
                     iconName: "close"
-                    iconColor: win.darkMode ? win.textColor : "#62635f"
+                    iconColor: win.textColor
                     onClicked: win.closeSearch()
                 }
             }

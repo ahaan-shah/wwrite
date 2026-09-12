@@ -54,6 +54,23 @@ Item {
                 context.lineTo(4.5, 9.5);
                 context.lineTo(11.5, 9.5);
                 context.lineTo(11.5, 13.5);
+            } else if (control.iconName === "saveas") {
+                // The save icon, shrunk to make room for a plus: same action,
+                // but to a new file.
+                context.moveTo(1.5, 2.5);
+                context.lineTo(8, 2.5);
+                context.lineTo(10.5, 5);
+                context.lineTo(10.5, 11.5);
+                context.lineTo(1.5, 11.5);
+                context.closePath();
+                context.moveTo(4, 2.5);
+                context.lineTo(4, 5);
+                context.lineTo(7.5, 5);
+                context.lineTo(7.5, 2.5);
+                context.moveTo(12.5, 9.5);
+                context.lineTo(12.5, 15);
+                context.moveTo(9.75, 12.25);
+                context.lineTo(15.25, 12.25);
             } else {
                 context.moveTo(2.5, 13);
                 context.lineTo(2.5, 3.5);

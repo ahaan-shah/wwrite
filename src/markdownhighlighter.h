@@ -11,7 +11,8 @@ public:
     explicit MarkdownHighlighter(QTextDocument *document);
 
     void setDarkMode(bool darkMode);
-    void setColors(const QString &background, const QString &foreground, const QString &accent);
+    void setColors(const QString &background, const QString &foreground,
+                   const QString &accent, const QString &muted, const QString &surface);
     void setSearch(const QString &query, int currentMatchStart);
 
     struct Span {
@@ -45,6 +46,8 @@ private:
     QString m_customBackground;
     QString m_customForeground;
     QString m_customAccent;
+    QString m_customMuted;
+    QString m_customSurface;
     QTextCharFormat m_markerFormat;
     QTextCharFormat m_hiddenMarkerFormat;
     QTextCharFormat m_headingFormat;

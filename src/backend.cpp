@@ -36,6 +36,11 @@
 constexpr qreal typoraLineHeightPercent = 140;
 const QString lastSaveDirectorySetting = QStringLiteral("file/lastSaveDirectory");
 
+// The file browser now reaches the whole filesystem, so open() has to survive
+// being pointed at things that are not documents. 64 MiB is far past any
+// plausible piece of writing and still loads without stalling the UI.
+constexpr qint64 maximumOpenSize = 64 * 1024 * 1024;
+
 QString Backend::normalizedLinkUrl(const QString &clipboardText) {
     QString candidate = clipboardText.trimmed();
     static const QRegularExpression lineBreakRe(QStringLiteral("[\\r\\n]"));
@@ -117,15 +122,15 @@ Backend::Backend(QObject *parent) : QObject(parent) {
                 emit externalChangeDetected(deleted, m_modified);
             });
 
-    loadOmarchyTheme();
-    watchOmarchyTheme();
+    loadPywalTheme();
+    watchPywalTheme();
     connect(&m_themeWatcher, &QFileSystemWatcher::fileChanged, this, [this]() {
-        loadOmarchyTheme();
-        watchOmarchyTheme();
+        loadPywalTheme();
+        watchPywalTheme();
     });
     connect(&m_themeWatcher, &QFileSystemWatcher::directoryChanged, this, [this]() {
-        loadOmarchyTheme();
-        watchOmarchyTheme();
+        loadPywalTheme();
+        watchPywalTheme();
     });
 }
 
@@ -150,11 +155,13 @@ QString Backend::fileName() const {
 }
 
 void Backend::setDarkMode(bool darkMode) {
-    if (m_darkMode == darkMode)
+    // pywal's palette decides light versus dark whenever it is available. The
+    // desktop portal only gets a say when pywal has never run on this machine.
+    if (m_pywalLoaded || m_darkMode == darkMode)
         return;
 
     m_darkMode = darkMode;
-    loadOmarchyTheme();
+    loadPywalTheme();
     emit darkModeChanged();
 }
 
@@ -180,7 +187,8 @@ void Backend::attachDocument(QObject *textDocument) {
     m_lastDocumentText = m_document->toPlainText();
     m_highlighter = new MarkdownHighlighter(m_document);
     m_highlighter->setDarkMode(m_darkMode);
-    m_highlighter->setColors(m_themeBackground, m_themeForeground, m_themeAccent);
+    m_highlighter->setColors(m_themeBackground, m_themeForeground, m_themeAccent,
+                             m_themeMuted, m_themeSurface);
 
     connect(m_document, &QTextDocument::contentsChange, this,
             [this](int position, int, int charsAdded) {
@@ -204,14 +212,40 @@ void Backend::open(const QUrl &url) {
         return;
     }
 
-    const QString targetName = QFileInfo(url.toLocalFile()).fileName();
+    const QFileInfo info(url.toLocalFile());
+    const QString targetName = info.fileName();
+
+    // Directories, devices, FIFOs and sockets. Reading /dev/zero would never
+    // return, and a directory just fails confusingly further down.
+    if (!info.isFile()) {
+        setStatus(info.isDir()
+            ? QStringLiteral("%1 is a folder.").arg(targetName)
+            : QStringLiteral("%1 is not a regular file.").arg(targetName));
+        return;
+    }
+
     QFile file(url.toLocalFile());
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         setStatus(QStringLiteral("Could not open %1.").arg(targetName));
         return;
     }
 
-    const QByteArray contents = file.readAll();
+    // Read one byte past the cap rather than trusting the reported size: files
+    // under /proc report zero and still have contents, and a log can grow
+    // between the stat and the read.
+    const QByteArray contents = file.read(maximumOpenSize + 1);
+    if (contents.size() > maximumOpenSize) {
+        setStatus(QStringLiteral("%1 is too large to open.").arg(targetName));
+        return;
+    }
+
+    // A NUL byte means this is not text. Loading it would fill the editor with
+    // replacement characters and quietly corrupt the file if it were saved back.
+    if (contents.contains('\0')) {
+        setStatus(QStringLiteral("%1 is not a text file.").arg(targetName));
+        return;
+    }
+
     loadDocumentText(QString::fromUtf8(contents));
     clearRecovery();
     m_lastKnownFileContents = contents;
@@ -573,93 +607,282 @@ void Backend::watchCurrentFile() {
         m_fileWatcher.addPath(m_fileUrl.toLocalFile());
 }
 
-void Backend::loadOmarchyTheme() {
-    m_themeBackground = m_darkMode ? QStringLiteral("#101010") : QStringLiteral("#ffffff");
-    m_themeForeground = m_darkMode ? QStringLiteral("#eeeeee") : QStringLiteral("#222324");
-    m_themeAccent = m_darkMode ? QStringLiteral("#5584aa") : QStringLiteral("#2077b2");
-    m_themeSelection = m_darkMode ? QStringLiteral("#186a9a") : QStringLiteral("#2077b2");
+namespace {
+QString walDirectory() {
+    return QDir::homePath() + QStringLiteral("/.cache/wal");
+}
 
-    const QString colorsPath = QDir::homePath()
-        + QStringLiteral("/.local/state/omarchy/current/theme/colors.toml");
-    QString themeMode;
-    QFile file(colorsPath);
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QTextStream in(&file);
-        while (!in.atEnd()) {
-            const QString line = in.readLine().trimmed();
-            if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
-                continue;
+// Blend `from` toward `to` in sRGB; ratio 0 keeps `from`, 1 returns `to`.
+QColor blend(const QColor &from, const QColor &to, qreal ratio) {
+    if (!from.isValid())
+        return to;
+    if (!to.isValid())
+        return from;
 
-            const int equals = line.indexOf(QLatin1Char('='));
-            if (equals < 0)
-                continue;
+    const qreal keep = 1.0 - ratio;
+    return QColor::fromRgbF(from.redF() * keep + to.redF() * ratio,
+                            from.greenF() * keep + to.greenF() * ratio,
+                            from.blueF() * keep + to.blueF() * ratio);
+}
 
-            const QString key = line.left(equals).trimmed();
-            QString value = line.mid(equals + 1).trimmed();
-            if (value.size() >= 2
-                    && ((value.front() == QLatin1Char('"') && value.back() == QLatin1Char('"'))
-                        || (value.front() == QLatin1Char('\'') && value.back() == QLatin1Char('\''))))
-                value = value.mid(1, value.size() - 2);
+qreal luminance(const QColor &color) {
+    return 0.299 * color.redF() + 0.587 * color.greenF() + 0.114 * color.blueF();
+}
 
-            if (key == QStringLiteral("mode"))
-                themeMode = value;
-            else if (key == QStringLiteral("background"))
-                m_themeBackground = value;
-            else if (key == QStringLiteral("foreground"))
-                m_themeForeground = value;
-            else if (key == QStringLiteral("accent"))
-                m_themeAccent = value;
-            else if (key == QStringLiteral("selection"))
-                m_themeSelection = value;
+// Read pywal's current palette. colors.json is the canonical output; the plain
+// `colors` file is the fallback for setups whose template set omits the JSON.
+bool readPywalPalette(QColor *background, QColor *foreground, QList<QColor> *palette) {
+    QFile json(walDirectory() + QStringLiteral("/colors.json"));
+    if (json.open(QIODevice::ReadOnly)) {
+        const QJsonObject root = QJsonDocument::fromJson(json.readAll()).object();
+        const QJsonObject special = root.value(QStringLiteral("special")).toObject();
+        const QJsonObject colors = root.value(QStringLiteral("colors")).toObject();
+
+        const QColor page(special.value(QStringLiteral("background")).toString());
+        const QColor ink(special.value(QStringLiteral("foreground")).toString());
+        if (page.isValid() || ink.isValid()) {
+            if (page.isValid())
+                *background = page;
+            if (ink.isValid())
+                *foreground = ink;
+            for (int index = 0; index < 16; ++index) {
+                palette->append(QColor(
+                    colors.value(QStringLiteral("color%1").arg(index)).toString()));
+            }
+            return true;
         }
     }
 
-    bool themeModeKnown = false;
-    bool themeIsDark = m_darkMode;
-    if (themeMode == QStringLiteral("dark")) {
-        themeIsDark = true;
-        themeModeKnown = true;
-    } else if (themeMode == QStringLiteral("light")) {
-        themeIsDark = false;
-        themeModeKnown = true;
-    } else {
-        const QColor background(m_themeBackground);
-        if (background.isValid()) {
-            const double luminance = 0.299 * background.redF()
-                + 0.587 * background.greenF() + 0.114 * background.blueF();
-            themeIsDark = luminance < 0.5;
-            themeModeKnown = true;
-        }
+    QFile plain(walDirectory() + QStringLiteral("/colors"));
+    if (!plain.open(QIODevice::ReadOnly | QIODevice::Text))
+        return false;
+
+    QTextStream in(&plain);
+    while (!in.atEnd() && palette->size() < 16)
+        palette->append(QColor(in.readLine().trimmed()));
+
+    if (palette->isEmpty() || !palette->constFirst().isValid()) {
+        palette->clear();
+        return false;
     }
-    if (themeModeKnown && themeIsDark != m_darkMode) {
+
+    // The plain file carries no special section, so fall back to the convention
+    // every pywal template uses: color0 is the page and color7 the ink.
+    *background = palette->constFirst();
+    if (palette->size() > 7 && palette->at(7).isValid())
+        *foreground = palette->at(7);
+    return true;
+}
+
+// pywal has no notion of an accent, so take the first usable entry in the order
+// its own templates favour, skipping anything that would vanish into the page.
+QColor pickAccent(const QList<QColor> &palette, const QColor &background,
+                  const QColor &foreground) {
+    static const int preferred[] = {4, 5, 6, 2, 3, 1, 12, 13, 14};
+    const qreal page = luminance(background);
+    for (const int index : preferred) {
+        if (index >= palette.size())
+            continue;
+
+        const QColor candidate = palette.at(index);
+        if (candidate.isValid() && qAbs(luminance(candidate) - page) >= 0.12)
+            return candidate;
+    }
+
+    return foreground;
+}
+}
+
+void Backend::loadPywalTheme() {
+    // Stand-ins for a machine where pywal has never run; the desktop portal
+    // still picks which of the two sets applies.
+    QColor background(m_darkMode ? QStringLiteral("#101010") : QStringLiteral("#ffffff"));
+    QColor foreground(m_darkMode ? QStringLiteral("#eeeeee") : QStringLiteral("#222324"));
+    QList<QColor> palette;
+
+    m_pywalLoaded = readPywalPalette(&background, &foreground, &palette);
+
+    const QColor accent = m_pywalLoaded
+        ? pickAccent(palette, background, foreground)
+        : QColor(m_darkMode ? QStringLiteral("#5584aa") : QStringLiteral("#2077b2"));
+
+    // Selected text keeps the foreground colour, so pull the accent back toward
+    // the page to leave the words on top of the fill legible.
+    const QColor selection = blend(accent, background, 0.45);
+
+    // color8 is pywal's dim grey. Where it is missing, or too close to the page
+    // to read, meet the foreground partway instead.
+    QColor muted = palette.size() > 8 ? palette.at(8) : QColor();
+    if (!muted.isValid() || qAbs(luminance(muted) - luminance(background)) < 0.1)
+        muted = blend(background, foreground, 0.45);
+
+    // Code spans and the search bar sit just off the page in either direction.
+    const QColor surface = blend(background, foreground, 0.08);
+
+    m_themeBackground = background.name();
+    m_themeForeground = foreground.name();
+    m_themeAccent = accent.name();
+    m_themeSelection = selection.name();
+    m_themeMuted = muted.name();
+    m_themeSurface = surface.name();
+
+    const bool themeIsDark = luminance(background) < 0.5;
+    if (themeIsDark != m_darkMode) {
         m_darkMode = themeIsDark;
         emit darkModeChanged();
     }
 
     if (m_highlighter) {
         m_highlighter->setDarkMode(m_darkMode);
-        m_highlighter->setColors(m_themeBackground, m_themeForeground, m_themeAccent);
+        m_highlighter->setColors(m_themeBackground, m_themeForeground, m_themeAccent,
+                                 m_themeMuted, m_themeSurface);
     }
 
     emit themeColorsChanged();
 }
 
-void Backend::watchOmarchyTheme() {
+void Backend::watchPywalTheme() {
     const QStringList watched = m_themeWatcher.files() + m_themeWatcher.directories();
     if (!watched.isEmpty())
         m_themeWatcher.removePaths(watched);
 
-    const QString currentDir = QDir::homePath()
-        + QStringLiteral("/.local/state/omarchy/current");
-    const QString themeDir = currentDir + QStringLiteral("/theme");
-    const QString colorsPath = themeDir + QStringLiteral("/colors.toml");
+    const QString directory = walDirectory();
 
-    if (QDir(currentDir).exists())
-        m_themeWatcher.addPath(currentDir);
-    if (QDir(themeDir).exists())
-        m_themeWatcher.addPath(themeDir);
-    if (QFile::exists(colorsPath))
-        m_themeWatcher.addPath(colorsPath);
+    // Watch the directory as well as the files: `wal` replaces its output
+    // rather than editing it in place, so a file watch goes stale after the
+    // first theme change and a missing file has to be picked up when it lands.
+    if (QDir(directory).exists())
+        m_themeWatcher.addPath(directory);
+
+    for (const QString &name : {QStringLiteral("colors.json"), QStringLiteral("colors")}) {
+        const QString path = directory + QLatin1Char('/') + name;
+        if (QFile::exists(path))
+            m_themeWatcher.addPath(path);
+    }
+}
+
+// The in-app file browser's sidebar. Only offer places that actually exist, so
+// a machine without an ~/XDG user-dirs setup does not get dead entries.
+QVariantList Backend::standardPlaces() const {
+    const struct { QStandardPaths::StandardLocation location; const char *name; } places[] = {
+        {QStandardPaths::HomeLocation, "Home"},
+        {QStandardPaths::DesktopLocation, "Desktop"},
+        {QStandardPaths::DocumentsLocation, "Documents"},
+        {QStandardPaths::DownloadLocation, "Downloads"},
+        {QStandardPaths::PicturesLocation, "Pictures"},
+        {QStandardPaths::MusicLocation, "Music"},
+        {QStandardPaths::MoviesLocation, "Videos"},
+    };
+
+    QVariantList result;
+    QStringList seen;
+    for (const auto &place : places) {
+        const QString path = QStandardPaths::writableLocation(place.location);
+        if (path.isEmpty() || seen.contains(path) || !QFileInfo(path).isDir())
+            continue;
+
+        seen.append(path);
+        result.append(QVariantMap{
+            {QStringLiteral("name"), QString::fromLatin1(place.name)},
+            {QStringLiteral("url"), QUrl::fromLocalFile(path)},
+        });
+    }
+
+    result.append(QVariantMap{
+        {QStringLiteral("name"), QStringLiteral("Filesystem")},
+        {QStringLiteral("url"), QUrl::fromLocalFile(QStringLiteral("/"))},
+    });
+    return result;
+}
+
+// The folder one level up, or an empty URL at the filesystem root. The browser
+// used to derive this from the breadcrumbs, which made $HOME a dead end: it
+// collapses to a single "~" crumb with no parent to walk back to.
+QUrl Backend::parentFolder(const QUrl &folder) const {
+    if (!folder.isLocalFile())
+        return {};
+
+    QDir directory(folder.toLocalFile());
+    if (directory.isRoot() || !directory.cdUp())
+        return {};
+
+    return QUrl::fromLocalFile(directory.absolutePath());
+}
+
+// Path segments for the browser's breadcrumb bar, shortened to "~" once the
+// path enters the home directory.
+QVariantList Backend::folderCrumbs(const QUrl &folder) const {
+    if (!folder.isLocalFile())
+        return {};
+
+    const QString home = QDir::cleanPath(QDir::homePath());
+    QString path = QDir::cleanPath(folder.toLocalFile());
+
+    QVariantList crumbs;
+    const auto prepend = [&crumbs](const QString &name, const QString &target) {
+        crumbs.prepend(QVariantMap{
+            {QStringLiteral("name"), name},
+            {QStringLiteral("url"), QUrl::fromLocalFile(target)},
+        });
+    };
+
+    while (!path.isEmpty()) {
+        if (path == home) {
+            prepend(QStringLiteral("~"), path);
+            return crumbs;
+        }
+        if (path == QStringLiteral("/")) {
+            prepend(QStringLiteral("/"), path);
+            return crumbs;
+        }
+
+        const int slash = path.lastIndexOf(QLatin1Char('/'));
+        if (slash < 0)
+            return crumbs;
+
+        prepend(path.mid(slash + 1), path);
+        path = slash == 0 ? QStringLiteral("/") : path.left(slash);
+    }
+    return crumbs;
+}
+
+// Both dialogs always start in the home folder. Following the open document or
+// the last-used directory meant a single excursion into somewhere like /etc
+// became the starting point for every later open and save.
+QUrl Backend::startFolder() const {
+    return QUrl::fromLocalFile(QDir::homePath());
+}
+
+// Save As is the one exception: it starts beside the document being saved, so
+// "save a copy next to the original" stays a single step. A document that has
+// never been written anywhere still starts at home.
+QUrl Backend::saveStartFolder() const {
+    if (m_fileUrl.isLocalFile()) {
+        const QString directory = QFileInfo(m_fileUrl.toLocalFile()).absolutePath();
+        if (!directory.isEmpty() && QDir(directory).exists())
+            return QUrl::fromLocalFile(directory);
+    }
+
+    return startFolder();
+}
+
+bool Backend::fileExists(const QUrl &url) const {
+    return url.isLocalFile() && QFileInfo::exists(url.toLocalFile());
+}
+
+QUrl Backend::folderChild(const QUrl &folder, const QString &name) const {
+    if (!folder.isLocalFile() || name.isEmpty())
+        return {};
+
+    return QUrl::fromLocalFile(QDir(folder.toLocalFile()).filePath(name));
+}
+
+QString Backend::fileNameOf(const QUrl &url) const {
+    if (!url.isLocalFile())
+        return QStringLiteral("Untitled.md");
+
+    const QString name = QFileInfo(url.toLocalFile()).fileName();
+    return name.isEmpty() ? QStringLiteral("Untitled.md") : name;
 }
 
 QUrl Backend::suggestedSaveUrl() const {

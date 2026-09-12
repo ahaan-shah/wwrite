@@ -1,14 +1,17 @@
 import QtQuick
 import QtQuick.Controls
+import "ThemeColors.js" as ThemeColors
 
 Dialog {
     id: root
 
     property string fileName: "Untitled.md"
     property bool darkMode: true
+    property color pageColor: darkMode ? "#101010" : "#ffffff"
     property color textColor: darkMode ? "#d0d0d0" : "#42464c"
     property color strongTextColor: darkMode ? "#eeeeee" : "#222324"
     property color activeButtonColor: "#428bca"
+    property color surfaceColor: ThemeColors.mix(pageColor, strongTextColor, 0.08)
     property int containerWidth: 420
     property int containerHeight: 320
     property real textScale: 1
@@ -20,6 +23,12 @@ Dialog {
     modal: true
     focus: true
     closePolicy: Popup.CloseOnEscape
+
+    // Dim toward the page colour; Material's own dim is a light wash in the
+    // dark theme, and it overrides anything set at the window level.
+    Overlay.modal: Rectangle {
+        color: Qt.rgba(root.pageColor.r, root.pageColor.g, root.pageColor.b, 0.72)
+    }
     onRejected: cancelRequested()
 
     onOpened: saveButton.forceActiveFocus()
@@ -27,10 +36,11 @@ Dialog {
     x: Math.round((containerWidth - width) / 2)
     y: Math.round((containerHeight - height) / 2)
     padding: 20
+    topPadding: 20
 
     background: Rectangle {
-        color: root.darkMode ? "#1a1a1a" : "#ffffff"
-        border.color: root.darkMode ? "#343434" : "#d8d8d8"
+        color: root.surfaceColor
+        border.color: ThemeColors.mix(root.surfaceColor, root.strongTextColor, 0.22)
         radius: 0
     }
 
@@ -69,6 +79,8 @@ Dialog {
                 id: cancelButton
                 text: "Cancel"
                 darkMode: root.darkMode
+                pageColor: root.surfaceColor
+                inkColor: root.strongTextColor
                 textScale: root.textScale
                 labelColor: root.textColor
                 KeyNavigation.left: saveButton
@@ -82,6 +94,8 @@ Dialog {
                 id: discardButton
                 text: "Discard"
                 darkMode: root.darkMode
+                pageColor: root.surfaceColor
+                inkColor: root.strongTextColor
                 textScale: root.textScale
                 labelColor: root.textColor
                 KeyNavigation.left: cancelButton
@@ -99,6 +113,8 @@ Dialog {
                 text: "Save"
                 primary: true
                 darkMode: root.darkMode
+                pageColor: root.surfaceColor
+                inkColor: root.strongTextColor
                 textScale: root.textScale
                 activeColor: root.activeButtonColor
                 KeyNavigation.left: discardButton
