@@ -44,23 +44,6 @@ back out. `PREFIX=/usr/local sudo -E ./bin/install` installs system-wide instead
 Run `./bin/build` alone to just produce `build/wwrite`, and `./bin/test` for the
 test suite.
 
-### Icon
-
-The launcher entry points at the desktop theme's own text-editor icon
-(`org.gnome.TextEditor`), so it matches whatever icon theme is in use — on a
-Papirus-Dark desktop it resolves to Papirus's text editor icon. To use the icon
-bundled in `packaging/` instead:
-
-```sh
-ICON=wwrite ./bin/install
-```
-
-That art is installed either way, so switching is one re-run apart. It is also
-compiled into the binary, so a window still has an icon where no icon theme is
-configured. Note that theme icons are *referenced by name*, never copied into
-this repo — Papirus is GPL-3.0 and this project is MIT, so bundling its art
-would be a licence conflict.
-
 ## Theming
 
 Colours come from pywal's current palette, read at startup and re-read whenever

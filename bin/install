@@ -12,10 +12,11 @@ DATADIR="${XDG_DATA_HOME:-$HOME/.local/share}"
 ICONDIR="$DATADIR/icons/hicolor"
 APPDIR="$DATADIR/applications"
 
-# Which icon name the launcher entry points at. Defaults to the desktop theme's
-# text-editor icon; set ICON=wwrite to use the art bundled in packaging/ instead.
-# That art is installed either way, so switching is one re-run apart.
-ICON="${ICON:-org.gnome.TextEditor}"
+# Which icon name the launcher entry points at. Defaults to the art bundled in
+# packaging/, which ships with the project and is MIT like the rest of it. Set
+# ICON to any icon-theme name to borrow your desktop theme's icon instead, e.g.
+# ICON=org.gnome.TextEditor. The bundled art is installed either way.
+ICON="${ICON:-wwrite}"
 
 "$ROOT/bin/build"
 

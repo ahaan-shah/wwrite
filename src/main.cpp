@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
     // Theme lookup only works once a platform theme plugin has added the XDG
     // icon paths, which is not guaranteed. Fall back to the copy compiled into
     // the binary so the window always carries an icon.
-    QIcon icon = QIcon::fromTheme(QStringLiteral("org.gnome.TextEditor"));
+    QIcon icon = QIcon::fromTheme(QStringLiteral("wwrite"));
     if (icon.isNull())
         icon = QIcon(QStringLiteral(":/wwrite.svg"));
     app.setWindowIcon(icon);

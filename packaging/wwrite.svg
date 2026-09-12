@@ -1,46 +1,38 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
   <defs>
     <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#3f4a5a"/>
-      <stop offset="1" stop-color="#232a34"/>
+      <stop offset="0" stop-color="#4a5568"/>
+      <stop offset="1" stop-color="#252c39"/>
     </linearGradient>
     <linearGradient id="sheet" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#e7eaef"/>
+      <stop offset="1" stop-color="#e8ebf0"/>
     </linearGradient>
-    <linearGradient id="barrel" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#f9d25e"/>
-      <stop offset="0.55" stop-color="#f0b429"/>
-      <stop offset="1" stop-color="#d98b12"/>
+    <linearGradient id="fold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#c9cfda"/>
+      <stop offset="1" stop-color="#aab3c2"/>
     </linearGradient>
-    <filter id="lift" x="-40%" y="-40%" width="180%" height="180%">
-      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#10141a" flood-opacity="0.45"/>
-    </filter>
   </defs>
 
   <rect x="12" y="12" width="232" height="232" rx="52" fill="url(#tile)"/>
 
-  <!-- Page, inset far enough that a circular launcher mask cannot clip the text. -->
-  <rect x="58" y="44" width="124" height="164" rx="12" fill="#000000" opacity="0.25"
-        transform="translate(0 5)"/>
-  <rect x="58" y="44" width="124" height="164" rx="12" fill="url(#sheet)"/>
-
-  <!-- A heading, body copy, a short last line, then the caret. -->
-  <rect x="78" y="72" width="60" height="12" rx="6" fill="#5b6675"/>
-  <g fill="#9aa5b3">
-    <rect x="78" y="104" width="84" height="9" rx="4.5"/>
-    <rect x="78" y="126" width="84" height="9" rx="4.5"/>
-    <rect x="78" y="148" width="66" height="9" rx="4.5"/>
-    <rect x="78" y="170" width="40" height="9" rx="4.5"/>
+  <!-- Page with a folded top-right corner: the most legible "document" cue at
+       small sizes. Inset enough that a circular launcher mask cannot clip it. -->
+  <g transform="translate(0 4)">
+    <path d="M62 48 h86 l46 46 v114 a10 10 0 0 1 -10 10 H62 a10 10 0 0 1 -10 -10 V58 a10 10 0 0 1 10 -10 z"
+          fill="#000000" opacity="0.22"/>
   </g>
-  <rect x="126" y="165" width="6" height="19" rx="3" fill="#4f9cf9"/>
+  <path d="M62 48 h86 l46 46 v114 a10 10 0 0 1 -10 10 H62 a10 10 0 0 1 -10 -10 V58 a10 10 0 0 1 10 -10 z"
+        fill="url(#sheet)"/>
+  <path d="M148 48 l46 46 h-36 a10 10 0 0 1 -10 -10 z" fill="url(#fold)"/>
 
-  <!-- Pencil resting over the page's lower-right corner. The shadow is what
-       keeps the dark graphite from reading as a notch cut out of the page. -->
-  <g transform="rotate(45 190 182)" filter="url(#lift)">
-    <rect x="178" y="122" width="24" height="64" rx="4" fill="url(#barrel)"/>
-    <rect x="178" y="186" width="24" height="8" fill="#c2701c"/>
-    <path d="M178 194 h24 l-12 24 z" fill="#f5e2bd"/>
-    <path d="M184 206 h12 l-6 12 z" fill="#39404a"/>
+  <!-- Lines of text, ragged like real prose rather than a uniform block. -->
+  <g fill="#7c8798">
+    <rect x="76" y="112" width="92" height="10" rx="5"/>
+    <rect x="76" y="136" width="92" height="10" rx="5"/>
+    <rect x="76" y="160" width="70" height="10" rx="5"/>
   </g>
+  <!-- Caret on the last line: this is an editor, not a viewer. -->
+  <rect x="76" y="182" width="42" height="10" rx="5" fill="#7c8798"/>
+  <rect x="126" y="177" width="7" height="20" rx="3.5" fill="#4f9cf9"/>
 </svg>
