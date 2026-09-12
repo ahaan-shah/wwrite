@@ -19,20 +19,20 @@
   <!-- Page with a folded top-right corner: the most legible "document" cue at
        small sizes. Inset enough that a circular launcher mask cannot clip it. -->
   <g transform="translate(0 4)">
-    <path d="M62 48 h86 l46 46 v114 a10 10 0 0 1 -10 10 H62 a10 10 0 0 1 -10 -10 V58 a10 10 0 0 1 10 -10 z"
+    <path d="M67 43 h86 l46 46 v114 a10 10 0 0 1 -10 10 H67 a10 10 0 0 1 -10 -10 V53 a10 10 0 0 1 10 -10 z"
           fill="#000000" opacity="0.22"/>
   </g>
-  <path d="M62 48 h86 l46 46 v114 a10 10 0 0 1 -10 10 H62 a10 10 0 0 1 -10 -10 V58 a10 10 0 0 1 10 -10 z"
+  <path d="M67 43 h86 l46 46 v114 a10 10 0 0 1 -10 10 H67 a10 10 0 0 1 -10 -10 V53 a10 10 0 0 1 10 -10 z"
         fill="url(#sheet)"/>
-  <path d="M148 48 l46 46 h-36 a10 10 0 0 1 -10 -10 z" fill="url(#fold)"/>
+  <path d="M153 43 l46 46 h-36 a10 10 0 0 1 -10 -10 z" fill="url(#fold)"/>
 
   <!-- Lines of text, ragged like real prose rather than a uniform block. -->
   <g fill="#7c8798">
-    <rect x="76" y="112" width="92" height="10" rx="5"/>
-    <rect x="76" y="136" width="92" height="10" rx="5"/>
-    <rect x="76" y="160" width="70" height="10" rx="5"/>
+    <rect x="81" y="107" width="92" height="10" rx="5"/>
+    <rect x="81" y="131" width="92" height="10" rx="5"/>
+    <rect x="81" y="155" width="70" height="10" rx="5"/>
   </g>
   <!-- Caret on the last line: this is an editor, not a viewer. -->
-  <rect x="76" y="182" width="42" height="10" rx="5" fill="#7c8798"/>
-  <rect x="126" y="177" width="7" height="20" rx="3.5" fill="#4f9cf9"/>
+  <rect x="81" y="177" width="42" height="10" rx="5" fill="#7c8798"/>
+  <rect x="131" y="172" width="7" height="20" rx="3.5" fill="#4f9cf9"/>
 </svg>
