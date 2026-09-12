@@ -32,7 +32,13 @@ Dialog {
     onRejected: cancelRequested()
 
     onOpened: saveButton.forceActiveFocus()
-    width: Math.min(420, containerWidth - 48)
+    width: Math.min(Math.round(420 * textScale), containerWidth - 48)
+
+    // Cancel is the one that goes when all three will not fit: Escape still
+    // cancels, whereas Discard and Save have no other route.
+    readonly property bool roomForCancel: width - 40 >= cancelButton.implicitWidth
+        + discardButton.implicitWidth + saveButton.implicitWidth
+        + 2 * dialogButtons.spacing
     x: Math.round((containerWidth - width) / 2)
     y: Math.round((containerHeight - height) / 2)
     padding: 20
@@ -77,6 +83,7 @@ Dialog {
 
             SquareDialogButton {
                 id: cancelButton
+                visible: root.roomForCancel
                 text: "Cancel"
                 darkMode: root.darkMode
                 pageColor: root.surfaceColor
@@ -98,7 +105,7 @@ Dialog {
                 inkColor: root.strongTextColor
                 textScale: root.textScale
                 labelColor: root.textColor
-                KeyNavigation.left: cancelButton
+                KeyNavigation.left: root.roomForCancel ? cancelButton : saveButton
                 KeyNavigation.right: saveButton
                 KeyNavigation.tab: saveButton
                 KeyNavigation.backtab: cancelButton

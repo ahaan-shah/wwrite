@@ -488,6 +488,83 @@ private slots:
                  QStringLiteral("a heading.md"));
     }
 
+    void dropsFooterControlsAsTheBrowserNarrows() {
+        const QString qmlPath = QFINDTESTDATA("../src/FileBrowserDialog.qml");
+        QVERIFY(!qmlPath.isEmpty());
+
+        Backend backend;
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(qmlPath));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> dialog(component.create());
+        QVERIFY2(dialog, qPrintable(component.errorString()));
+
+        dialog->setProperty("saving", true);
+        QObject *footer = dialog->findChild<QObject *>(QStringLiteral("browserFooter"));
+        QVERIFY(footer);
+
+        const auto shown = [&](const char *name) {
+            return footer->property(name).toBool();
+        };
+        const auto widthOf = [&](int container) {
+            dialog->setProperty("containerWidth", container);
+        };
+
+        // Roomy: everything on show.
+        widthOf(1000);
+        QVERIFY(shown("showName"));
+        QVERIFY(shown("showFormat"));
+        QVERIFY(shown("showDotfiles"));
+
+        // They drop one at a time, in this order, and never come back early.
+        widthOf(660);
+        QVERIFY(shown("showName"));
+        QVERIFY(shown("showFormat"));
+        QVERIFY(!shown("showDotfiles"));
+
+        widthOf(560);
+        QVERIFY(shown("showName"));
+        QVERIFY(!shown("showFormat"));
+        QVERIFY(!shown("showDotfiles"));
+
+        widthOf(400);
+        QVERIFY(!shown("showName"));
+        QVERIFY(!shown("showFormat"));
+        QVERIFY(!shown("showDotfiles"));
+
+        // Even at the window's minimum width the actions survive, which is the
+        // whole point: Cancel and Save are never dropped.
+        widthOf(320);
+        QVERIFY(!shown("showName"));
+    }
+
+    void dropsCancelWhenTheUnsavedDialogIsTooNarrow() {
+        const QString qmlPath = QFINDTESTDATA("../src/UnsavedChangesDialog.qml");
+        QVERIFY(!qmlPath.isEmpty());
+
+        QQmlEngine engine;
+        QQmlComponent component(&engine, QUrl::fromLocalFile(qmlPath));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> dialog(component.create());
+        QVERIFY2(dialog, qPrintable(component.errorString()));
+
+        dialog->setProperty("textScale", 1.0);
+
+        // Wide enough for Cancel, Discard and Save side by side.
+        dialog->setProperty("containerWidth", 640);
+        QVERIFY(dialog->property("roomForCancel").toBool());
+
+        // Below the point where all three fit, Cancel is the one that goes:
+        // Escape still cancels, while Discard and Save have no other route.
+        dialog->setProperty("containerWidth", 360);
+        QVERIFY(!dialog->property("roomForCancel").toBool());
+
+        // Right down at the window's minimum it still must not overflow.
+        dialog->setProperty("containerWidth", 320);
+        QVERIFY(!dialog->property("roomForCancel").toBool());
+    }
+
     void scalesTextWithDesktopTextSize() {
         const QString mainQmlPath = QFINDTESTDATA("../src/Main.qml");
         QVERIFY(!mainQmlPath.isEmpty());

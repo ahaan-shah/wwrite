@@ -539,6 +539,7 @@ Dialog {
         // ---- Footer ---------------------------------------------------------
         Rectangle {
             id: footer
+            objectName: "browserFooter"
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
@@ -561,6 +562,35 @@ Dialog {
                 text: root.widestLabel(["All files", "Documents only"])
             }
 
+            TextMetrics {
+                id: dotfilesMetrics
+                font.family: root.mono
+                font.pixelSize: Math.round(12 * root.textScale)
+                text: root.widestLabel(["Show dotfiles", "Hide dotfiles"])
+            }
+
+            // Cancel and Save are never dropped, so everything else has to fit
+            // in what is left beside them. SquareDialogButton pads 16 a side and
+            // floors at 88, which is where these numbers come from.
+            readonly property real gap: 10
+            readonly property real formatWidth: Math.max(88, Math.ceil(formatMetrics.width) + 32)
+            readonly property real filterWidth: Math.max(88, Math.ceil(filterMetrics.width) + 32)
+            readonly property real dotfilesWidth: Math.max(88, Math.ceil(dotfilesMetrics.width) + 32)
+            readonly property real nameBlockWidth: nameLabel.implicitWidth + gap + root.sized(150)
+            readonly property real freeWidth: width - root.sized(32) - actionsRow.width - gap
+
+            // Dropped one at a time as the window narrows: dotfiles first, then
+            // the format toggle, then the name field. Escape and the file list
+            // still work once the name field is gone.
+            readonly property real needName: root.saving ? nameBlockWidth : filterWidth
+            readonly property real needFormat: needName + gap + formatWidth
+            readonly property real needDotfiles: (root.saving ? needFormat : needName) + gap + dotfilesWidth
+
+            readonly property bool showName: root.saving && freeWidth >= needName
+            readonly property bool showFormat: root.saving && freeWidth >= needFormat
+            readonly property bool showFilter: !root.saving && freeWidth >= needName
+            readonly property bool showDotfiles: freeWidth >= needDotfiles
+
             Row {
                 anchors.left: parent.left
                 anchors.leftMargin: 16
@@ -570,7 +600,8 @@ Dialog {
                 spacing: 10
 
                 Label {
-                    visible: root.saving
+                    id: nameLabel
+                    visible: footer.showName
                     anchors.verticalCenter: parent.verticalCenter
                     text: "Name"
                     color: root.mutedColor
@@ -579,9 +610,13 @@ Dialog {
                 }
 
                 Rectangle {
-                    visible: root.saving
+                    visible: footer.showName
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.max(root.sized(150), footer.width - root.sized(560))
+                    // Takes whatever the surviving toggles leave behind.
+                    width: Math.max(root.sized(150), footer.freeWidth
+                        - nameLabel.implicitWidth - footer.gap
+                        - (footer.showFormat ? footer.formatWidth + footer.gap : 0)
+                        - (footer.showDotfiles ? footer.dotfilesWidth + footer.gap : 0))
                     height: root.sized(32)
                     color: root.pageColor
                     border.color: nameField.activeFocus
@@ -609,9 +644,9 @@ Dialog {
                 // The extension decides the file type, so this stays visible
                 // even when the narrow layout drops the other toggles.
                 SquareDialogButton {
-                    visible: root.saving
+                    visible: footer.showFormat
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.max(88, Math.ceil(formatMetrics.width) + 32)
+                    width: footer.formatWidth
                     text: root.saveFormats[root.saveFormatIndex].label
                     darkMode: root.darkMode
                     pageColor: root.surfaceColor
@@ -622,8 +657,9 @@ Dialog {
 
                 // Hidden files and the Markdown filter, as plain toggles.
                 SquareDialogButton {
-                    visible: root.width >= root.sized(600)
+                    visible: footer.showDotfiles
                     anchors.verticalCenter: parent.verticalCenter
+                    width: footer.dotfilesWidth
                     text: root.showHidden ? "Hide dotfiles" : "Show dotfiles"
                     darkMode: root.darkMode
                     pageColor: root.surfaceColor
@@ -633,9 +669,9 @@ Dialog {
                 }
 
                 SquareDialogButton {
-                    visible: !root.saving && root.width >= root.sized(600)
+                    visible: footer.showFilter
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.max(88, Math.ceil(filterMetrics.width) + 32)
+                    width: footer.filterWidth
                     text: root.markdownOnly ? "All files" : "Documents only"
                     darkMode: root.darkMode
                     pageColor: root.surfaceColor
@@ -646,6 +682,7 @@ Dialog {
             }
 
             Row {
+                id: actionsRow
                 anchors.right: parent.right
                 anchors.rightMargin: 16
                 anchors.verticalCenter: parent.verticalCenter

@@ -29,7 +29,7 @@ Dialog {
     Overlay.modal: Rectangle {
         color: Qt.rgba(root.pageColor.r, root.pageColor.g, root.pageColor.b, 0.72)
     }
-    width: Math.min(520, containerWidth - 48)
+    width: Math.min(Math.round(520 * textScale), containerWidth - 48)
     x: Math.round((containerWidth - width) / 2)
     y: Math.round((containerHeight - height) / 2)
     padding: 20
