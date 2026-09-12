@@ -9,6 +9,10 @@ import "ThemeColors.js" as ThemeColors
 Dialog {
     id: root
 
+    // The document this browser is acting for. Passed in rather than taken from
+    // a global, now that a window holds several documents at once.
+    property var backend: null
+
     property bool saving: false
     property url folder
     property string suggestedName: "Untitled.md"
@@ -30,7 +34,7 @@ Dialog {
     signal canceled()
 
     readonly property string mono: "iA Writer Mono S"
-    readonly property var crumbs: backend.folderCrumbs(folder)
+    readonly property var crumbs: backend ? backend.folderCrumbs(folder) : []
 
     function sized(value) { return Math.round(value * textScale); }
 
@@ -51,6 +55,8 @@ Dialog {
 
     // The chosen file: whatever is typed when saving, otherwise the selected row.
     function chosenFile() {
+        if (!backend)
+            return "";
         if (saving) {
             var name = nameField.text.trim();
             if (name.length === 0)
@@ -144,6 +150,8 @@ Dialog {
     }
 
     function goUp() {
+        if (!backend)
+            return;
         var up = backend.parentFolder(root.folder);
         if (up.toString().length === 0)
             return;
@@ -240,7 +248,7 @@ Dialog {
                         id: upArea
                         anchors.fill: parent
                         hoverEnabled: true
-                        enabled: backend.parentFolder(root.folder).toString().length > 0
+                        enabled: root.backend && root.backend.parentFolder(root.folder).toString().length > 0
                         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                         onClicked: root.goUp()
                     }
@@ -309,7 +317,7 @@ Dialog {
                 anchors.topMargin: 8
 
                 Repeater {
-                    model: backend.standardPlaces()
+                    model: backend ? backend.standardPlaces() : []
 
                     Rectangle {
                         width: sidebar.width

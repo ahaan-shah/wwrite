@@ -32,7 +32,10 @@ class Backend : public QObject {
     Q_PROPERTY(QString themeSurface READ themeSurface NOTIFY themeColorsChanged)
 
 public:
-    explicit Backend(QObject *parent = nullptr);
+    // recoverOrphans: claim a snapshot left behind by an abnormal exit and load
+    // it on attach. Only the session's first document should; a document opened
+    // later would otherwise adopt a crashed draft and overwrite it unread.
+    explicit Backend(QObject *parent = nullptr, bool recoverOrphans = true);
     ~Backend() override;
 
     void setParentWindow(QWindow *window);
@@ -69,7 +72,6 @@ public:
     Q_INVOKABLE void reloadFromDisk();
     Q_INVOKABLE void keepExternalVersion();
     Q_INVOKABLE void printDocument();
-    Q_INVOKABLE void newWindow();
     Q_INVOKABLE QString clipboardUrl() const;
     Q_INVOKABLE QString clipboardText() const;
     Q_INVOKABLE bool editorTextChanged();
@@ -154,5 +156,6 @@ private:
     QString m_themeMuted;
     QString m_themeSurface;
     bool m_pywalLoaded = false;
+    bool m_recoverOrphans = true;
     QFileSystemWatcher m_themeWatcher;
 };

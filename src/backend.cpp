@@ -9,7 +9,6 @@
 #include <QDesktopServices>
 #include <QGuiApplication>
 #include <QMimeData>
-#include <QProcess>
 #include <QPrintDialog>
 #include <QPrinter>
 #include <QQuickTextDocument>
@@ -76,12 +75,13 @@ QString Backend::normalizedLinkUrl(const QString &clipboardText) {
     return url.toString();
 }
 
-Backend::Backend(QObject *parent) : QObject(parent) {
+Backend::Backend(QObject *parent, bool recoverOrphans)
+    : QObject(parent), m_recoverOrphans(recoverOrphans) {
     const QString stateDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(stateDirectory);
     // Claim an orphaned snapshot before taking an empty slot. This ensures a
     // crash in window 2 is still recovered even if window 1 exited normally.
-    for (int pass = 0; pass < 2 && !m_recoveryLock; ++pass) {
+    for (int pass = recoverOrphans ? 0 : 1; pass < 2 && !m_recoveryLock; ++pass) {
         for (int slot = 0; slot < 100; ++slot) {
             const QString base = QDir(stateDirectory).filePath(
                 QStringLiteral("recovery-%1").arg(slot));
@@ -199,7 +199,8 @@ void Backend::attachDocument(QObject *textDocument) {
             });
 
     applyDocumentTypography();
-    restoreRecovery();
+    if (m_recoverOrphans)
+        restoreRecovery();
 }
 
 void Backend::openDialog() {
@@ -332,12 +333,6 @@ void Backend::printDocument() {
     }
 }
 
-void Backend::newWindow() {
-    const bool started = QProcess::startDetached(QCoreApplication::applicationFilePath(),
-                                                 QStringList());
-    if (!started)
-        setStatus(QStringLiteral("Could not open a new window."));
-}
 
 QString Backend::clipboardUrl() const {
     const QClipboard *clipboard = QGuiApplication::clipboard();

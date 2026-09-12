@@ -14,6 +14,10 @@ in the app borrows another toolkit's look.
 - **A built-in file browser.** Opening and saving no longer call out to a
   platform dialog; the picker carries the same palette as the editor, and it can
   reach the whole filesystem rather than just `$HOME`.
+- **Several documents in one process.** `Ctrl+N` opens another document in the
+  same window rather than launching a second copy of the app, and `Ctrl+T`
+  cycles between them. Upstream forked a new process per window, costing a fresh
+  Qt runtime (~65 MB) each time.
 - **Save As**, as a footer button as well as `Ctrl+Shift+S`, so an already-open
   document can be written elsewhere without overwriting the original.
 - **Markdown or plain text**, chosen with a format toggle in the save view.
@@ -113,13 +117,31 @@ Markdown extension, so flip the filter to **All files** to see them. wwrite open
 them read-write like any other file — saving over a root-owned file will fail on
 permissions, as it should.
 
+## Documents
+
+`Ctrl+N` adds a document, `Ctrl+T` moves to the next and wraps at the end, and
+`Ctrl+W` closes the current one (or the window, when it is the last). There is no
+tab bar: the window title and a small `2/3` beside the word count say where you
+are, and that counter is clickable. Each document keeps its own text, cursor,
+scroll position, undo history and file, so cycling away and back leaves
+everything as you left it.
+
+Closing the window asks about every unsaved document in turn, not just the one on
+screen.
+
+They share a single process, which was the point: upstream's `Ctrl+N` started a
+detached process per window, so five documents meant five Qt runtimes, and a
+window that outlived its siblings left an instance running.
+
 ## Shortcuts
 
 - `Ctrl+S` saves. Unsaved documents open the built-in browser first.
 - `Ctrl+Shift+S` saves as.
 - `Ctrl+O` opens a file through the built-in browser.
 - `Ctrl+P` opens the system print dialog.
-- `Ctrl+N` opens a new wwrite window.
+- `Ctrl+N` opens another document in the same window.
+- `Ctrl+T` cycles to the next document.
+- `Ctrl+W` closes the current document, or the window when it is the last.
 - `Ctrl+Z`, `Ctrl+Shift+Z`, and `Ctrl+Y` handle undo and redo.
 - `Super+F` toggles fullscreen. Qt maps this key as `Meta+F`.
 - `Ctrl+F` searches the document. Use `Enter` or `Ctrl+G` for the next match and `Shift+Enter` for the previous match.

@@ -3,11 +3,13 @@
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlEngine>
+#include <QQmlError>
 #include <QQuickStyle>
 
 #include <QColor>
 
 #include "backend.h"
+#include "session.h"
 #include "markdownhighlighter.h"
 
 namespace {
@@ -408,15 +410,24 @@ private slots:
         const QString mainQmlPath = QFINDTESTDATA("../src/Main.qml");
         QVERIFY(!mainQmlPath.isEmpty());
 
-        Backend backend;
+        Session session(nullptr);
+        Backend &backend = *session.current();
         QQmlEngine engine;
-        engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+        // Surface QML warnings; a delegate that fails to build is otherwise a
+        // silent null in findChild.
+        QObject::connect(&engine, &QQmlEngine::warnings, [](const QList<QQmlError> &warnings) {
+            for (const QQmlError &warning : warnings)
+                qWarning().noquote() << warning.toString();
+        });
+        engine.rootContext()->setContextProperty(QStringLiteral("session"), &session);
         QQmlComponent component(&engine, QUrl::fromLocalFile(mainQmlPath));
         QVERIFY2(component.isReady(), qPrintable(component.errorString()));
         QScopedPointer<QObject> window(component.create());
         QVERIFY2(window, qPrintable(component.errorString()));
 
-        QVERIFY(window->findChild<QObject *>(QStringLiteral("sourceEditor")));
+        QObject *currentEditor = window->property("currentEditor").value<QObject *>();
+        QVERIFY2(currentEditor, "the session's first document should have an editor");
+        QCOMPARE(currentEditor->objectName(), QStringLiteral("sourceEditor"));
         QVERIFY(!window->findChild<QObject *>(QStringLiteral("renderedPreview")));
         QVERIFY(!window->findChild<QObject *>(QStringLiteral("modeToggle")));
 
@@ -434,6 +445,100 @@ private slots:
         QCOMPARE(openDialogSpy.count(), 1);
     }
 
+    void keepsSeveralDocumentsInOneProcess() {
+        Session session(nullptr);
+        QCOMPARE(session.count(), 1);
+        Backend *first = session.current();
+        QVERIFY(first);
+
+        session.newDocument();
+        QCOMPARE(session.count(), 2);
+        QCOMPARE(session.currentIndex(), 1);
+        QVERIFY(session.current() != first);
+
+        session.newDocument();
+        QCOMPARE(session.count(), 3);
+        Backend *third = session.current();
+
+        session.cycle();
+        QCOMPARE(session.currentIndex(), 0);
+        QCOMPARE(session.current(), first);
+        session.cycle();
+        QCOMPARE(session.currentIndex(), 1);
+        session.cycle();
+        QCOMPARE(session.current(), third);
+
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        first->saveAs(QUrl::fromLocalFile(directory.filePath(QStringLiteral("one.md"))));
+        QCOMPARE(first->fileName(), QStringLiteral("one.md"));
+        QCOMPARE(third->fileName(), QStringLiteral("Untitled.md"));
+    }
+
+    void closesDocumentsAndReportsUnsavedOnes() {
+        Session session(nullptr);
+        session.newDocument();
+        session.newDocument();
+        QCOMPARE(session.count(), 3);
+        QCOMPARE(session.firstModified(), -1);
+
+        QVERIFY(session.closeCurrent());
+        QCOMPARE(session.count(), 2);
+        QVERIFY(session.current());
+
+        QVERIFY(session.closeCurrent());
+        QCOMPARE(session.count(), 1);
+
+        QVERIFY(!session.closeCurrent());
+        QCOMPARE(session.count(), 1);
+    }
+
+    void showsTheNewDocumentAfterCtrlN() {
+        const QString mainQmlPath = QFINDTESTDATA("../src/Main.qml");
+        QVERIFY(!mainQmlPath.isEmpty());
+
+        Session session(nullptr);
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty(QStringLiteral("session"), &session);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(mainQmlPath));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> window(component.create());
+        QVERIFY2(window, qPrintable(component.errorString()));
+
+        QObject *firstEditor = window->property("currentEditor").value<QObject *>();
+        QVERIFY(firstEditor);
+
+        // A second document has to bring its own text area forward, otherwise
+        // typing after Ctrl+N would land in the document you just left.
+        session.newDocument();
+        QObject *secondEditor = window->property("currentEditor").value<QObject *>();
+        QVERIFY(secondEditor);
+        QVERIFY2(secondEditor != firstEditor, "Ctrl+N kept showing the old editor");
+
+        // And cycling back returns the original one, text and all. This is the
+        // part that broke when the Repeater ran off a plain count: every
+        // delegate was rebuilt on Ctrl+N, silently emptying the others.
+        firstEditor->setProperty("text", QStringLiteral("first document"));
+        secondEditor->setProperty("text", QStringLiteral("second document"));
+
+        session.cycle();
+        QCOMPARE(window->property("currentEditor").value<QObject *>(), firstEditor);
+        QCOMPARE(firstEditor->property("text").toString(),
+                 QStringLiteral("first document"));
+
+        session.cycle();
+        QCOMPARE(window->property("currentEditor").value<QObject *>(), secondEditor);
+        QCOMPARE(secondEditor->property("text").toString(),
+                 QStringLiteral("second document"));
+
+        // A third document must not disturb the two that already have text.
+        session.newDocument();
+        QCOMPARE(firstEditor->property("text").toString(),
+                 QStringLiteral("first document"));
+        QCOMPARE(secondEditor->property("text").toString(),
+                 QStringLiteral("second document"));
+    }
+
     void offersSaveAsFromTheFooter() {
         const QString mainQmlPath = QFINDTESTDATA("../src/Main.qml");
         QVERIFY(!mainQmlPath.isEmpty());
@@ -441,9 +546,16 @@ private slots:
         QTemporaryDir directory;
         QVERIFY(directory.isValid());
 
-        Backend backend;
+        Session session(nullptr);
+        Backend &backend = *session.current();
         QQmlEngine engine;
-        engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+        // Surface QML warnings; a delegate that fails to build is otherwise a
+        // silent null in findChild.
+        QObject::connect(&engine, &QQmlEngine::warnings, [](const QList<QQmlError> &warnings) {
+            for (const QQmlError &warning : warnings)
+                qWarning().noquote() << warning.toString();
+        });
+        engine.rootContext()->setContextProperty(QStringLiteral("session"), &session);
         QQmlComponent component(&engine, QUrl::fromLocalFile(mainQmlPath));
         QVERIFY2(component.isReady(), qPrintable(component.errorString()));
         QScopedPointer<QObject> window(component.create());
@@ -494,12 +606,12 @@ private slots:
 
         Backend backend;
         QQmlEngine engine;
-        engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
         QQmlComponent component(&engine, QUrl::fromLocalFile(qmlPath));
         QVERIFY2(component.isReady(), qPrintable(component.errorString()));
         QScopedPointer<QObject> dialog(component.create());
         QVERIFY2(dialog, qPrintable(component.errorString()));
 
+        dialog->setProperty("backend", QVariant::fromValue(&backend));
         dialog->setProperty("saving", true);
         QObject *footer = dialog->findChild<QObject *>(QStringLiteral("browserFooter"));
         QVERIFY(footer);
@@ -569,15 +681,22 @@ private slots:
         const QString mainQmlPath = QFINDTESTDATA("../src/Main.qml");
         QVERIFY(!mainQmlPath.isEmpty());
 
-        Backend backend;
+        Session session(nullptr);
+        Backend &backend = *session.current();
         QQmlEngine engine;
-        engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+        // Surface QML warnings; a delegate that fails to build is otherwise a
+        // silent null in findChild.
+        QObject::connect(&engine, &QQmlEngine::warnings, [](const QList<QQmlError> &warnings) {
+            for (const QQmlError &warning : warnings)
+                qWarning().noquote() << warning.toString();
+        });
+        engine.rootContext()->setContextProperty(QStringLiteral("session"), &session);
         QQmlComponent component(&engine, QUrl::fromLocalFile(mainQmlPath));
         QVERIFY2(component.isReady(), qPrintable(component.errorString()));
         QScopedPointer<QObject> window(component.create());
         QVERIFY2(window, qPrintable(component.errorString()));
 
-        QObject *editor = window->findChild<QObject *>(QStringLiteral("sourceEditor"));
+        QObject *editor = window->property("currentEditor").value<QObject *>();
         QVERIFY(editor);
         QCOMPARE(editor->property("font").value<QFont>().pixelSize(), 20);
 

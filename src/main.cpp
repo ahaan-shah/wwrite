@@ -11,6 +11,7 @@
 #include <QFile>
 
 #include "backend.h"
+#include "session.h"
 #include "systemtheme.h"
 
 int main(int argc, char *argv[]) {
@@ -36,11 +37,8 @@ int main(int argc, char *argv[]) {
 
     QQuickStyle::setStyle(QStringLiteral("Material"));
 
-    Backend backend(&app);
     SystemTheme systemTheme(&app);
-    backend.setDarkMode(systemTheme.darkMode());
-    QObject::connect(&systemTheme, &SystemTheme::darkModeChanged, &backend,
-                     &Backend::setDarkMode);
+    Session session(&systemTheme, &app);
 
     // Carry the desktop's text scale into the default font, so the chrome that
     // inherits it (dialog titles, buttons) grows along with the writing area.
@@ -55,11 +53,11 @@ int main(int argc, char *argv[]) {
     };
     applyInterfaceFont(systemTheme.textScale());
 
-    backend.setTextScale(systemTheme.textScale());
-    QObject::connect(&systemTheme, &SystemTheme::textScaleChanged, &backend,
-                     [&backend, applyInterfaceFont](qreal textScale) {
+    // Session keeps each document's own text scale in step; this only has to
+    // carry the change into the application font the chrome inherits.
+    QObject::connect(&systemTheme, &SystemTheme::textScaleChanged, &app,
+                     [applyInterfaceFont](qreal textScale) {
         applyInterfaceFont(textScale);
-        backend.setTextScale(textScale);
     });
 
     QQmlApplicationEngine engine;
@@ -68,7 +66,7 @@ int main(int argc, char *argv[]) {
         for (const QQmlError &warning : warnings)
             qWarning().noquote() << warning.toString();
     });
-    engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+    engine.rootContext()->setContextProperty(QStringLiteral("session"), &session);
 
     engine.load(QUrl(QStringLiteral("qrc:/Main.qml")));
     if (engine.rootObjects().isEmpty()) {
@@ -77,11 +75,25 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    backend.setParentWindow(qobject_cast<QWindow *>(engine.rootObjects().constFirst()));
+    auto *window = qobject_cast<QWindow *>(engine.rootObjects().constFirst());
 
+    // A file per argument, each in its own document, so `wwrite a.md b.md`
+    // opens both rather than only the first.
     const QStringList args = app.arguments();
-    if (args.size() > 1 && !backend.modified())
-        backend.open(QUrl::fromLocalFile(args.at(1)));
+    for (int index = 1; index < args.size(); ++index) {
+        if (index > 1)
+            session.newDocument();
+        if (Backend *document = session.current()) {
+            if (!document->modified())
+                document->open(QUrl::fromLocalFile(args.at(index)));
+        }
+    }
+    session.setCurrentIndex(0);
+
+    for (int index = 0; index < session.count(); ++index) {
+        if (Backend *document = session.at(index))
+            document->setParentWindow(window);
+    }
 
     return app.exec();
 }
